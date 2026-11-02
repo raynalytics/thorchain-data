@@ -1,0 +1,1407 @@
+version: 2
+
+models:
+  - name: events__bonds
+    description: "One row per `bond` event: RUNE bonded to, rewarded to, returned from or charged to a node."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: chain
+        description: "{{ doc('chain') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: to_address
+        description: "{{ doc('to_address') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "Amount of `asset` in the transaction, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: bond_type
+        description: "`bond_paid`, `bond_reward`, `bond_returned` or `bond_cost`."
+      - name: bond_amount
+        description: "RUNE moved by the event, real units."
+      - name: bond_amount_e8
+        description: "`bond_amount` as a raw chain integer (1e-8 units)."
+      - name: bond_change
+        description: "Change to total bonded RUNE: positive for `bond_paid` and `bond_reward`, negative for `bond_returned` and `bond_cost`."
+      - name: bond_change_e8
+        description: "`bond_change` as a raw chain integer (1e-8 units)."
+      - name: bond_address
+        description: "Bond provider's address."
+      - name: node_address
+        description: "{{ doc('node_address') }}"
+      - name: signer_address
+        description: "Address that signed the transaction."
+      - name: tx_type
+        description: "{{ doc('tx_type') }}"
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__contract_events
+    description: "One row per CosmWasm contract event (`wasm-*`)."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: contract_address
+        description: "Contract that emitted the event."
+      - name: contract_type
+        description: "Event type, without the `wasm-` prefix."
+      - name: sender_address
+        description: "Address that called the contract."
+      - name: attributes
+        description: "Event attributes (JSON)."
+      - name: msg
+        description: "Message the contract was called with (JSON)."
+      - name: funds
+        description: "Funds sent with the call."
+  - name: events__contract_instantiations
+    description: "One row per `instantiate` event: a CosmWasm contract instantiated."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: contract_address
+        description: "Address of the new contract."
+      - name: admin_address
+        description: "Admin of the contract."
+      - name: code_id
+        description: "Stored code the contract was created from."
+      - name: sender_address
+        description: "Address that instantiated the contract."
+      - name: label
+        description: "Contract label."
+      - name: msg
+        description: "Instantiation message (JSON)."
+      - name: funds
+        description: "Funds sent with the instantiation."
+  - name: events__donations
+    description: "One row per `donate` event: assets added to a pool's depth without issuing liquidity units."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: chain
+        description: "{{ doc('chain') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: to_address
+        description: "{{ doc('to_address') }}"
+      - name: pool
+        description: "{{ doc('pool') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: asset_amount
+        description: "Asset donated, real units."
+      - name: asset_amount_e8
+        description: "`asset_amount` as a raw chain integer (1e-8 units)."
+      - name: rune_amount
+        description: "RUNE donated, real units."
+      - name: rune_amount_e8
+        description: "`rune_amount` as a raw chain integer (1e-8 units)."
+      - name: tx_type
+        description: "{{ doc('tx_type') }}"
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__errata
+    description: "One row per `errata` event: a correction to pool depths after a transaction on another chain was rolled back."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "Hash of the corrected inbound transaction."
+      - name: pool
+        description: "{{ doc('pool') }}"
+      - name: asset_amount
+        description: "Change to the pool's asset depth, real units (can be negative)."
+      - name: asset_amount_e8
+        description: "`asset_amount` as a raw chain integer (1e-8 units)."
+      - name: rune_amount
+        description: "Change to the pool's RUNE depth, real units (can be negative)."
+      - name: rune_amount_e8
+        description: "`rune_amount` as a raw chain integer (1e-8 units)."
+  - name: events__failed_deposits
+    description: "One row per failed THORChain deposit transaction (`MsgDeposit`)."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "{{ doc('amount') }}"
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: code
+        description: "Result code; non-zero means the transaction failed."
+      - name: reason
+        description: "Why the deposit failed."
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__gas_reimbursements
+    description: "One row per `gas` event: gas the network reimbursed to a pool for outbound transactions."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: pool
+        description: "Pool reimbursed."
+      - name: asset_amount
+        description: "Asset spent on gas and taken from the pool, real units."
+      - name: asset_amount_e8
+        description: "`asset_amount` as a raw chain integer (1e-8 units)."
+      - name: rune_amount
+        description: "RUNE added to the pool in compensation, real units."
+      - name: rune_amount_e8
+        description: "`rune_amount` as a raw chain integer (1e-8 units)."
+      - name: tx_count
+        description: "Number of outbound transactions covered."
+  - name: events__limit_swaps
+    description: "One row per `limit_swap` event: a limit order placed in the swap queue."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: to_address
+        description: "Destination address of the order."
+      - name: from_asset
+        description: "Asset offered."
+      - name: from_amount
+        description: "Amount offered, real units."
+      - name: from_amount_e8
+        description: "`from_amount` as a raw chain integer (1e-8 units)."
+      - name: to_asset
+        description: "Asset wanted."
+      - name: to_amount
+        description: "Minimum amount wanted, real units."
+      - name: to_amount_e8
+        description: "`to_amount` as a raw chain integer (1e-8 units)."
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__liquidity_adds
+    description: "One row per `add_liquidity` event: liquidity added to a pool."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: pool
+        description: "{{ doc('pool') }}"
+      - name: asset_tx_id
+        description: "Hash of the transaction that sent the asset side, if any."
+      - name: asset_chain
+        description: "Chain of the asset side."
+      - name: asset_address
+        description: "{{ doc('asset_address') }}"
+      - name: asset_amount
+        description: "Asset added, real units."
+      - name: asset_amount_e8
+        description: "`asset_amount` as a raw chain integer (1e-8 units)."
+      - name: rune_tx_id
+        description: "Hash of the transaction that sent the RUNE side, if any."
+      - name: rune_address
+        description: "{{ doc('rune_address') }}"
+      - name: rune_amount
+        description: "RUNE added, real units."
+      - name: rune_amount_e8
+        description: "`rune_amount` as a raw chain integer (1e-8 units)."
+      - name: liquidity_units_added
+        description: "Liquidity units issued to the provider."
+      - name: asset_value_in_rune
+        description: "Value of the asset added, in RUNE at the pool price of the block."
+      - name: asset_value_in_rune_e8
+        description: "`asset_value_in_rune` as a raw chain integer (1e-8 units)."
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__liquidity_withdrawals
+    description: "One row per `withdraw` event: liquidity removed from a pool."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: chain
+        description: "{{ doc('chain') }}"
+      - name: from_address
+        description: "Address that sent the withdrawal request."
+      - name: to_address
+        description: "{{ doc('to_address') }}"
+      - name: pool
+        description: "{{ doc('pool') }}"
+      - name: asset
+        description: "Asset of the withdrawal request transaction (usually a dust amount)."
+      - name: amount
+        description: "Amount sent with the withdrawal request, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: asset_amount
+        description: "Asset paid out, real units."
+      - name: asset_amount_e8
+        description: "`asset_amount` as a raw chain integer (1e-8 units)."
+      - name: rune_amount
+        description: "RUNE paid out, real units."
+      - name: rune_amount_e8
+        description: "`rune_amount` as a raw chain integer (1e-8 units)."
+      - name: liquidity_units_removed
+        description: "Liquidity units burned."
+      - name: basis_points
+        description: "Share of the position withdrawn, in basis points (10000 = all)."
+      - name: asymmetry
+        description: "Asymmetry of the withdrawal: 0 for both sides, towards -1 or 1 for one side."
+      - name: impermanent_loss_protection
+        description: "Impermanent loss protection paid, in RUNE."
+      - name: impermanent_loss_protection_e8
+        description: "`impermanent_loss_protection` as a raw chain integer (1e-8 units)."
+      - name: asset_value_in_rune
+        description: "Value of the asset paid out, in RUNE at the pool price of the block."
+      - name: asset_value_in_rune_e8
+        description: "`asset_value_in_rune` as a raw chain integer (1e-8 units)."
+      - name: tx_type
+        description: "{{ doc('tx_type') }}"
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__messages
+    description: "One row per `message` event: the sender and action of each message in a transaction."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: action
+        description: "Message action, e.g. `deposit` or `send`."
+  - name: events__mimir_changes
+    description: "One row per `set_mimir` event: a Mimir setting changed by admin or by node vote."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: key
+        description: "Mimir key."
+      - name: value
+        description: "New value."
+  - name: events__mint_burns
+    description: "One row per `mint_burn` event: native assets minted or burned."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "{{ doc('amount') }}"
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: supply
+        description: "Supply of the asset after the event, real units."
+      - name: supply_e8
+        description: "`supply` as a raw chain integer (1e-8 units)."
+      - name: reason
+        description: "Why the asset was minted or burned."
+  - name: events__network_versions
+    description: "One row per `version` event: the network protocol version changed."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: version
+        description: "New version."
+  - name: events__new_nodes
+    description: "One row per `new_node` event: a node account registered."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: node_address
+        description: "{{ doc('node_address') }}"
+  - name: events__node_ip_addresses
+    description: "One row per `set_ip_address` event: a node's IP address set."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: node_address
+        description: "{{ doc('node_address') }}"
+      - name: ip_address
+        description: "IP address registered."
+  - name: events__node_keys
+    description: "One row per `set_node_keys` event: a node's keys registered."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: node_address
+        description: "{{ doc('node_address') }}"
+      - name: secp256k1_pubkey
+        description: "Node's secp256k1 public key."
+      - name: ed25519_pubkey
+        description: "Node's ed25519 public key."
+      - name: validator_consensus_pubkey
+        description: "Node's validator consensus public key."
+  - name: events__node_leave_requests
+    description: "One row per `validator_request_leave` event: a node asking to leave."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: node_address
+        description: "{{ doc('node_address') }}"
+  - name: events__node_mimir_votes
+    description: "One row per `set_node_mimir` event: a node's vote on a Mimir setting."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: node_address
+        description: "{{ doc('node_address') }}"
+      - name: key
+        description: "Mimir key."
+      - name: value
+        description: "Value voted for."
+  - name: events__node_versions
+    description: "One row per `set_version` event: the software version a node announced."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: node_address
+        description: "{{ doc('node_address') }}"
+      - name: version
+        description: "Version announced."
+  - name: events__outbound_fees
+    description: "One row per `fee` event: the network fee charged on an outbound."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "Fee charged, real units of `asset`."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: pool_deduct
+        description: "RUNE taken from the pool to cover the fee, real units."
+      - name: pool_deduct_e8
+        description: "`pool_deduct` as a raw chain integer (1e-8 units)."
+  - name: events__outbounds
+    description: "One row per `outbound` event: a transaction THORChain sent out to a user, plus affiliate fees paid in RUNE."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: in_tx_id
+        description: "Hash of the inbound transaction this outbound answers."
+      - name: chain
+        description: "{{ doc('chain') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: to_address
+        description: "{{ doc('to_address') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "{{ doc('amount') }}"
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: is_internal
+        description: "True when the outbound is a THORChain-native transfer rather than a transaction on another chain."
+      - name: tx_type
+        description: "{{ doc('tx_type') }}"
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__pending_liquidity
+    description: "One row per `pending_liquidity` event: one side of a two-sided add waiting for the other, or pending liquidity being withdrawn."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: pool
+        description: "{{ doc('pool') }}"
+      - name: pending_type
+        description: "`add` when liquidity is waiting for its other side, `withdraw` when pending liquidity is returned."
+      - name: asset_tx_id
+        description: "Hash of the asset-side transaction."
+      - name: asset_chain
+        description: "Chain of the asset side."
+      - name: asset_address
+        description: "{{ doc('asset_address') }}"
+      - name: asset_amount
+        description: "Asset pending, real units."
+      - name: asset_amount_e8
+        description: "`asset_amount` as a raw chain integer (1e-8 units)."
+      - name: rune_tx_id
+        description: "Hash of the RUNE-side transaction."
+      - name: rune_address
+        description: "{{ doc('rune_address') }}"
+      - name: rune_amount
+        description: "RUNE pending, real units."
+      - name: rune_amount_e8
+        description: "`rune_amount` as a raw chain integer (1e-8 units)."
+  - name: events__pool_balance_changes
+    description: "One row per `pool_balance_change` event: an adjustment to a pool's depths outside normal flows."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: pool
+        description: "{{ doc('pool') }}"
+      - name: rune_change
+        description: "Change to the pool's RUNE depth, real units; negative when RUNE was removed."
+      - name: rune_change_e8
+        description: "`rune_change` as a raw chain integer (1e-8 units)."
+      - name: asset_change
+        description: "Change to the pool's asset depth, real units; negative when the asset was removed."
+      - name: asset_change_e8
+        description: "`asset_change` as a raw chain integer (1e-8 units)."
+      - name: reason
+        description: "Reason for the adjustment."
+  - name: events__pool_rewards
+    description: "One row per pool per `rewards` event: block rewards paid to each pool."
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [event_id, pool]
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: pool
+        description: "{{ doc('pool') }}"
+        data_tests:
+          - not_null
+      - name: pool_rewards
+        description: "{{ doc('pool_rewards') }}"
+      - name: pool_rewards_e8
+        description: "`pool_rewards` as a raw chain integer (1e-8 units)."
+      - name: saver_rewards
+        description: "Rewards paid to savers in the pool, in RUNE."
+      - name: saver_rewards_e8
+        description: "`saver_rewards` as a raw chain integer (1e-8 units)."
+  - name: events__pool_status_changes
+    description: "One row per `pool` event: a change of pool status."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: pool
+        description: "{{ doc('pool') }}"
+      - name: status
+        description: "New status: `Available`, `Staged` or `Suspended`."
+  - name: events__rebonds
+    description: "One row per `rebond` event: bond moved from one bond provider address to another for the same node."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: node_address
+        description: "{{ doc('node_address') }}"
+      - name: old_bond_address
+        description: "Bond provider address the bond moved from."
+      - name: new_bond_address
+        description: "Bond provider address the bond moved to."
+      - name: to_address
+        description: "{{ doc('to_address') }}"
+      - name: amount
+        description: "RUNE moved, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__refunds
+    description: "One row per `refund` event: an inbound transaction returned to its sender."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: chain
+        description: "{{ doc('chain') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: to_address
+        description: "{{ doc('to_address') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "{{ doc('amount') }}"
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: second_asset
+        description: "Second asset of the inbound, if it carried two."
+      - name: second_amount
+        description: "Amount of `second_asset`, real units."
+      - name: second_amount_e8
+        description: "`second_amount` as a raw chain integer (1e-8 units)."
+      - name: code
+        description: "Result code; non-zero means the transaction failed."
+      - name: reason
+        description: "Why the transaction was refunded."
+      - name: tx_type
+        description: "{{ doc('tx_type') }}"
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__reserve_contributions
+    description: "One row per `reserve` event: funds sent to the Reserve."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: chain
+        description: "{{ doc('chain') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: to_address
+        description: "{{ doc('to_address') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "{{ doc('amount') }}"
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: contributor_address
+        description: "Address credited with the contribution."
+      - name: rune_amount
+        description: "RUNE added to the Reserve, real units."
+      - name: rune_amount_e8
+        description: "`rune_amount` as a raw chain integer (1e-8 units)."
+      - name: tx_type
+        description: "{{ doc('tx_type') }}"
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__rewards
+    description: "One row per `rewards` event (one per block): block rewards paid to bonded nodes. Pool rewards of the same event are in `pool_rewards`."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: bond_rewards
+        description: "{{ doc('bond_rewards') }}"
+      - name: bond_rewards_e8
+        description: "`bond_rewards` as a raw chain integer (1e-8 units)."
+  - name: events__rune_pool_deposits
+    description: "One row per `rune_pool_deposit` event: RUNE deposited into RUNEPool."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: rune_address
+        description: "{{ doc('rune_address') }}"
+      - name: amount
+        description: "RUNE deposited, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: rune_pool_units
+        description: "RUNEPool units issued."
+  - name: events__rune_pool_withdrawals
+    description: "One row per `rune_pool_withdraw` event: RUNE withdrawn from RUNEPool."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: rune_address
+        description: "{{ doc('rune_address') }}"
+      - name: amount
+        description: "RUNE withdrawn, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: rune_pool_units
+        description: "RUNEPool units burned."
+      - name: basis_points
+        description: "Share of the position withdrawn, in basis points (10000 = all)."
+      - name: affiliate_address
+        description: "Address of the affiliate on the withdrawal, if any."
+      - name: affiliate_fee_bps
+        description: "Affiliate fee rate, in basis points."
+      - name: affiliate_fee
+        description: "Affiliate fee paid, in RUNE."
+      - name: affiliate_fee_e8
+        description: "`affiliate_fee` as a raw chain integer (1e-8 units)."
+  - name: events__scheduled_outbounds
+    description: "One row per `scheduled_outbound` event: an outbound queued for signing."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: in_tx_id
+        description: "Hash of the inbound transaction this outbound answers."
+      - name: out_tx_id
+        description: "Hash of the outbound once known."
+      - name: chain
+        description: "{{ doc('chain') }}"
+      - name: to_address
+        description: "{{ doc('to_address') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "{{ doc('amount') }}"
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: asset_decimals
+        description: "Decimals of the asset on its own chain."
+      - name: gas_rate
+        description: "Gas rate the outbound may pay."
+      - name: max_gas_asset
+        description: "Assets that can pay the outbound's gas."
+      - name: max_gas_amount_e8
+        description: "Maximum gas per asset in `max_gas_asset`, raw chain integers (1e-8 units)."
+      - name: max_gas_decimals
+        description: "Decimals for each entry of `max_gas_asset`."
+      - name: module_name
+        description: "THORChain module the outbound is paid from."
+      - name: vault_pubkey
+        description: "{{ doc('vault_pubkey') }}"
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__secured_asset_deposits
+    description: "One row per `secured_asset_deposit` event: an asset deposited into a secured asset balance."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "Amount deposited, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: asset_address
+        description: "{{ doc('asset_address') }}"
+      - name: rune_address
+        description: "{{ doc('rune_address') }}"
+  - name: events__secured_asset_withdrawals
+    description: "One row per `secured_asset_withdraw` event: an asset withdrawn from a secured asset balance."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "Amount withdrawn, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: asset_address
+        description: "{{ doc('asset_address') }}"
+      - name: rune_address
+        description: "{{ doc('rune_address') }}"
+  - name: events__sends
+    description: "One row per THORChain send transaction (`MsgSend`)."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: to_address
+        description: "{{ doc('to_address') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "{{ doc('amount') }}"
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: code
+        description: "Result code; non-zero means the transaction failed."
+      - name: raw_log
+        description: "Raw result log of the transaction."
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__slash_points
+    description: "One row per `slash_points` event: slash points given to a node."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: node_address
+        description: "{{ doc('node_address') }}"
+      - name: slash_points
+        description: "Slash points given."
+      - name: reason
+        description: "Why the points were given."
+  - name: events__slashes
+    description: "One row per asset per `slash` event: assets taken from a pool when a vault was slashed."
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [event_id, pool, asset]
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: pool
+        description: "{{ doc('pool') }}"
+        data_tests:
+          - not_null
+      - name: asset
+        description: "{{ doc('asset') }}"
+        data_tests:
+          - not_null
+      - name: amount
+        description: "Amount slashed, real units (negative when taken from the pool)."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+  - name: events__streaming_swaps
+    description: "One row per `streaming_swap` event: the summary emitted when a streaming swap finishes."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: interval_blocks
+        description: "Blocks between sub-swaps."
+      - name: streaming_quantity
+        description: "Number of sub-swaps planned."
+      - name: streaming_count
+        description: "Number of sub-swaps executed."
+      - name: last_block_height
+        description: "Block height of the last sub-swap."
+      - name: deposit_asset
+        description: "Asset deposited."
+      - name: deposit_amount
+        description: "Amount deposited, real units."
+      - name: deposit_amount_e8
+        description: "`deposit_amount` as a raw chain integer (1e-8 units)."
+      - name: in_asset
+        description: "Asset swapped in."
+      - name: in_amount
+        description: "Amount actually swapped in, real units."
+      - name: in_amount_e8
+        description: "`in_amount` as a raw chain integer (1e-8 units)."
+      - name: out_asset
+        description: "Asset paid out."
+      - name: out_amount
+        description: "Amount paid out, real units."
+      - name: out_amount_e8
+        description: "`out_amount` as a raw chain integer (1e-8 units)."
+      - name: failed_swaps
+        description: "Numbers of the sub-swaps that failed."
+      - name: failed_swap_reasons
+        description: "Reasons the listed sub-swaps failed, in the same order."
+  - name: events__swaps
+    description: "One row per `swap` event: a single pool leg of a swap. A swap routed through RUNE has two legs; a streaming swap has one or two legs per sub-swap. `tx_id` links legs of the same swap."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: chain
+        description: "{{ doc('chain') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: to_address
+        description: "Inbound vault address the swap was sent to. The user's destination is in the memo."
+      - name: pool
+        description: "{{ doc('pool') }}"
+      - name: from_asset
+        description: "Asset going into the pool on this leg."
+      - name: from_amount
+        description: "Amount going into the pool, real units."
+      - name: from_amount_e8
+        description: "`from_amount` as a raw chain integer (1e-8 units)."
+      - name: to_asset
+        description: "Asset coming out of the pool on this leg."
+      - name: to_amount
+        description: "Amount coming out of the pool after the liquidity fee, real units."
+      - name: to_amount_e8
+        description: "`to_amount` as a raw chain integer (1e-8 units)."
+      - name: min_to_amount
+        description: "Minimum output the swap accepts (swap limit), real units of `to_asset`."
+      - name: min_to_amount_e8
+        description: "`min_to_amount` as a raw chain integer (1e-8 units)."
+      - name: swap_slip_bps
+        description: "Price slip of the leg in basis points."
+      - name: liquidity_fee
+        description: "{{ doc('liquidity_fee') }}"
+      - name: liquidity_fee_e8
+        description: "`liquidity_fee` as a raw chain integer (1e-8 units)."
+      - name: liquidity_fee_in_to_asset
+        description: "Liquidity fee in units of `to_asset`."
+      - name: liquidity_fee_in_to_asset_e8
+        description: "`liquidity_fee_in_to_asset` as a raw chain integer (1e-8 units)."
+      - name: direction
+        description: "Direction of the leg: `rune_to_asset`, `asset_to_rune`, `rune_to_synth`, `synth_to_rune`, `rune_to_trade`, `trade_to_rune`, `rune_to_secured`, `secured_to_rune`, `rune_to_derived` or `derived_to_rune`."
+      - name: is_streaming
+        description: "True when the leg is part of a streaming swap."
+      - name: streaming_count
+        description: "For streaming swaps, the number of the sub-swap this leg belongs to."
+      - name: streaming_quantity
+        description: "For streaming swaps, the number of sub-swaps planned."
+      - name: tx_type
+        description: "{{ doc('tx_type') }}"
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__switches
+    description: "One row per `switch` event: non-native RUNE (BEP2 or ERC20) upgraded to native RUNE."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: to_address
+        description: "{{ doc('to_address') }}"
+      - name: burn_asset
+        description: "Non-native RUNE burned."
+      - name: burn_amount
+        description: "Amount burned, real units."
+      - name: burn_amount_e8
+        description: "`burn_amount` as a raw chain integer (1e-8 units)."
+      - name: mint_asset
+        description: "Native asset minted."
+      - name: mint_amount
+        description: "Native RUNE minted, real units."
+      - name: mint_amount_e8
+        description: "`mint_amount` as a raw chain integer (1e-8 units)."
+  - name: events__tcy_claims
+    description: "One row per `tcy_claim` event: TCY claimed by a THORFi creditor."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: rune_address
+        description: "{{ doc('rune_address') }}"
+      - name: l1_address
+        description: "Address on the asset's own chain the claim is for."
+      - name: asset
+        description: "Asset the claim relates to."
+      - name: amount
+        description: "TCY claimed, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__tcy_distributions
+    description: "One row per `tcy_distribution` event: RUNE paid to a TCY staker."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: rune_address
+        description: "{{ doc('rune_address') }}"
+      - name: amount
+        description: "RUNE paid, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+  - name: events__tcy_stakes
+    description: "One row per `tcy_stake` event: TCY staked."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: rune_address
+        description: "{{ doc('rune_address') }}"
+      - name: amount
+        description: "TCY staked, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__tcy_unstakes
+    description: "One row per `tcy_unstake` event: TCY unstaked."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: rune_address
+        description: "{{ doc('rune_address') }}"
+      - name: amount
+        description: "TCY unstaked, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__thorname_changes
+    description: "One row per `thorname` event: a THORName registered, renewed or changed."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: thorname
+        description: "The THORName."
+      - name: chain
+        description: "Chain of the address being set."
+      - name: address
+        description: "Address the THORName points to on `chain`."
+      - name: owner_address
+        description: "Owner of the THORName."
+      - name: sender_address
+        description: "Address that sent the transaction."
+      - name: expiry_block_height
+        description: "Block height at which the THORName expires."
+      - name: registration_fee
+        description: "Registration fee paid, in RUNE."
+      - name: registration_fee_e8
+        description: "`registration_fee` as a raw chain integer (1e-8 units)."
+      - name: fund_amount
+        description: "RUNE paid towards the THORName's expiry, real units."
+      - name: fund_amount_e8
+        description: "`fund_amount` as a raw chain integer (1e-8 units)."
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: events__trade_account_deposits
+    description: "One row per `trade_account_deposit` event: an asset deposited into a trade account."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "Amount deposited, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: asset_address
+        description: "{{ doc('asset_address') }}"
+      - name: rune_address
+        description: "{{ doc('rune_address') }}"
+  - name: events__trade_account_withdrawals
+    description: "One row per `trade_account_withdraw` event: an asset withdrawn from a trade account."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "Amount withdrawn, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: asset_address
+        description: "{{ doc('asset_address') }}"
+      - name: rune_address
+        description: "{{ doc('rune_address') }}"
+  - name: events__transfers
+    description: "One row per `transfer` event: a movement of a native THORChain asset between addresses or modules."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: to_address
+        description: "{{ doc('to_address') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "{{ doc('amount') }}"
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+  - name: events__tss_keygen_failures
+    description: "One row per `tss_keygen_failure` event: a vault keygen that failed."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: fail_reason
+        description: "Why the keygen failed."
+      - name: is_unicast
+        description: "True when the failure happened in a unicast round."
+      - name: blamed_node_addresses
+        description: "Nodes blamed for the failure."
+      - name: round
+        description: "Keygen round that failed."
+      - name: keygen_block_height
+        description: "Block height of the keygen."
+  - name: events__tss_keygen_successes
+    description: "One row per `tss_keygen_success` event: a new vault key generated."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: vault_pubkey
+        description: "{{ doc('vault_pubkey') }}"
+      - name: member_pubkeys
+        description: "Public keys of the nodes in the new vault."
+      - name: keygen_block_height
+        description: "Block height of the keygen."
+  - name: events__vault_activations
+    description: "One row per `ActiveVault` event: an Asgard vault activated."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: vault_pubkey
+        description: "{{ doc('vault_pubkey') }}"
+  - name: events__vault_deactivations
+    description: "One row per `InactiveVault` event: an Asgard vault retired."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: vault_pubkey
+        description: "{{ doc('vault_pubkey') }}"

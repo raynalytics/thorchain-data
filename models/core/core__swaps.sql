@@ -1,0 +1,128 @@
+with legs as (
+    select * from {{ ref('core__swap_legs') }}
+),
+
+swap_ends as (
+    select
+        tx_id,
+        min(event_id) as first_event_id,
+        min(block_height) as block_height,
+        min(block_time) as block_time,
+        max(block_height) as end_block_height,
+        max(block_time) as end_block_time,
+        (array_agg(chain order by event_id))[1] as chain,
+        (array_agg(from_address order by event_id))[1] as from_address,
+        (array_agg(from_asset order by event_id))[1] as from_asset,
+        -- The output is what the RUNE-to-asset hop paid out; swaps with no such hop end in RUNE.
+        coalesce(
+            (array_agg(to_asset order by event_id desc) filter (where from_asset = 'THOR.RUNE'))[1],
+            'THOR.RUNE'
+        ) as to_asset,
+        (array_agg(memo order by event_id))[1] as memo,
+        (array_agg(tx_type order by event_id))[1] as tx_type,
+        count(*) as leg_count,
+        bool_or(is_streaming) as is_streaming,
+        max(streaming_quantity) as streaming_quantity,
+        sum(liquidity_fee_e8)::bigint as liquidity_fee_e8,
+        sum(liquidity_fee_usd) as liquidity_fee_usd,
+        sum(swap_volume_e8)::bigint as swap_volume_e8,
+        sum(swap_volume_usd) as swap_volume_usd
+    from legs
+    group by tx_id
+),
+
+swap_amounts as (
+    select
+        swap_ends.tx_id,
+        sum(legs.from_amount_e8) filter (where legs.from_asset = swap_ends.from_asset)::bigint as from_amount_e8,
+        sum(legs.from_amount_usd) filter (where legs.from_asset = swap_ends.from_asset) as from_amount_usd,
+        sum(legs.swap_volume_e8) filter (where legs.from_asset = swap_ends.from_asset)::bigint as input_value_e8,
+        sum(legs.to_amount_e8) filter (where legs.to_asset = swap_ends.to_asset)::bigint as to_amount_e8,
+        sum(legs.to_amount_usd) filter (where legs.to_asset = swap_ends.to_asset) as to_amount_usd
+    from swap_ends
+    inner join legs
+        on legs.tx_id = swap_ends.tx_id
+    group by swap_ends.tx_id
+),
+
+fee_affiliates as (
+    select
+        tx_id,
+        array_agg(affiliate order by first_event_id) as affiliates,
+        sum(affiliate_fee_bps)::bigint as affiliate_fee_bps,
+        sum(affiliate_fee_e8)::bigint as affiliate_fee_e8,
+        sum(affiliate_fee_usd) as affiliate_fee_usd
+    from (
+        select
+            tx_id,
+            affiliate,
+            min(event_id) as first_event_id,
+            max(affiliate_fee_bps) as affiliate_fee_bps,
+            sum(affiliate_fee_e8)::bigint as affiliate_fee_e8,
+            sum(affiliate_fee_usd) as affiliate_fee_usd
+        from {{ ref('core__affiliate_fees') }}
+        group by tx_id, affiliate
+    ) as per_affiliate
+    group by tx_id
+),
+
+combined as (
+    select
+        swap_ends.*,
+        swap_amounts.from_amount_e8,
+        swap_amounts.from_amount_usd,
+        swap_amounts.input_value_e8,
+        swap_amounts.to_amount_e8,
+        swap_amounts.to_amount_usd,
+        coalesce(
+            fee_affiliates.affiliates,
+            string_to_array({{ swap_memo_field('swap_ends.memo', 5) }}, '/')
+        ) as affiliates,
+        fee_affiliates.affiliate_fee_bps,
+        fee_affiliates.affiliate_fee_e8,
+        fee_affiliates.affiliate_fee_usd
+    from swap_ends
+    inner join swap_amounts
+        on swap_amounts.tx_id = swap_ends.tx_id
+    left join fee_affiliates
+        on fee_affiliates.tx_id = swap_ends.tx_id
+)
+
+select
+    tx_id,
+    block_height,
+    block_time,
+    (block_time at time zone 'UTC')::date as day,
+    end_block_height,
+    end_block_time,
+    chain,
+    from_address,
+    {{ swap_memo_field('memo', 3) }} as to_address,
+    from_asset,
+    {{ units('from_amount_e8') }} as from_amount,
+    from_amount_e8,
+    from_amount_usd,
+    to_asset,
+    {{ units('to_amount_e8') }} as to_amount,
+    to_amount_e8,
+    to_amount_usd,
+    from_amount_usd as user_volume_usd,
+    {{ units('swap_volume_e8') }} as swap_volume,
+    swap_volume_e8,
+    swap_volume_usd,
+    {{ units('liquidity_fee_e8') }} as liquidity_fee,
+    liquidity_fee_e8,
+    liquidity_fee_usd,
+    round(liquidity_fee_e8 * 10000.0 / nullif(input_value_e8, 0), 2) as liquidity_fee_bps,
+    affiliates[1] as affiliate,
+    affiliates,
+    affiliate_fee_bps,
+    {{ units('affiliate_fee_e8') }} as affiliate_fee,
+    affiliate_fee_e8,
+    affiliate_fee_usd,
+    leg_count,
+    is_streaming,
+    streaming_quantity,
+    tx_type,
+    memo
+from combined

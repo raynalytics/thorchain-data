@@ -1,0 +1,20 @@
+select
+    event_id,
+    {{ block_height('event_id') }} as block_height,
+    {{ block_time('block_timestamp') }} as block_time,
+    in_hash as in_tx_id,
+    out_hash as out_tx_id,
+    chain,
+    to_addr as to_address,
+    asset,
+    {{ units('asset_e8') }} as amount,
+    asset_e8 as amount_e8,
+    asset_decimals,
+    gas_rate,
+    max_gas_asset,
+    max_gas_amount as max_gas_amount_e8,
+    max_gas_decimals,
+    module_name,
+    vault_pub_key as vault_pubkey,
+    memo
+from {{ source('midgard', 'scheduled_outbound_events') }}

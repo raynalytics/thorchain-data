@@ -1,0 +1,81 @@
+version: 2
+
+models:
+  - name: legacy__loan_opens
+    description: "One row per `loan_open` event: a loan opened. Lending is retired; history only."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: owner_address
+        description: "Borrower's address."
+      - name: collateral_asset
+        description: "Asset deposited as collateral."
+      - name: collateral_deposited
+        description: "Collateral deposited, real units."
+      - name: collateral_deposited_e8
+        description: "`collateral_deposited` as a raw chain integer (1e-8 units)."
+      - name: target_asset
+        description: "Asset the loan was paid out in."
+      - name: debt_issued
+        description: "Debt issued, in TOR (USD value) real units."
+      - name: debt_issued_e8
+        description: "`debt_issued` as a raw chain integer (1e-8 units)."
+      - name: collateralization_ratio_bps
+        description: "Collateralization ratio, in basis points."
+  - name: legacy__loan_repayments
+    description: "One row per `loan_repayment` event: a loan repaid. Lending is retired; history only."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: owner_address
+        description: "Borrower's address."
+      - name: collateral_asset
+        description: "Asset deposited as collateral."
+      - name: collateral_withdrawn
+        description: "Collateral returned, real units."
+      - name: collateral_withdrawn_e8
+        description: "`collateral_withdrawn` as a raw chain integer (1e-8 units)."
+      - name: debt_repaid
+        description: "Debt repaid, in TOR (USD value) real units."
+      - name: debt_repaid_e8
+        description: "`debt_repaid` as a raw chain integer (1e-8 units)."
+  - name: legacy__yggdrasil_fundings
+    description: "One row per `asgard_fund_yggdrasil` event: an Asgard vault funding a Yggdrasil vault. Yggdrasil vaults are retired; history only."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: asset
+        description: "{{ doc('asset') }}"
+      - name: amount
+        description: "Amount sent, real units."
+      - name: amount_e8
+        description: "`amount` as a raw chain integer (1e-8 units)."
+      - name: vault_pubkey
+        description: "{{ doc('vault_pubkey') }}"

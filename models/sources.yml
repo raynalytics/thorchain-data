@@ -1,0 +1,78 @@
+version: 2
+
+sources:
+  - name: midgard
+    description: Tables written by Midgard (2.34 or newer) while it indexes THORChain. Internal to the build; not exposed publicly.
+    schema: midgard
+    tables:
+      - name: block_log
+        description: One row per indexed block.
+        loaded_at_field: "to_timestamp(timestamp::numeric / 1000000000)"
+        freshness:
+          warn_after: {count: 30, period: minute}
+          error_after: {count: 60, period: minute}
+      - name: block_pool_depths
+      - name: rune_price
+      - name: active_vault_events
+      - name: add_events
+      - name: affiliate_fee_events
+      - name: asgard_fund_yggdrasil_events
+      - name: bond_events
+      - name: errata_events
+      - name: failed_deposit_messages
+      - name: fee_events
+      - name: gas_events
+      - name: inactive_vault_events
+      - name: instantiate_events
+      - name: limit_swap_events
+      - name: loan_open_events
+      - name: loan_repayment_events
+      - name: message_events
+      - name: mint_burn_events
+      - name: network_version_events
+      - name: new_node_events
+      - name: outbound_events
+      - name: pending_liquidity_events
+      - name: pool_balance_change_events
+      - name: pool_events
+      - name: rebond_events
+      - name: refund_events
+      - name: reserve_events
+      - name: rewards_events
+      - name: rewards_event_entries
+      - name: rune_pool_deposit_events
+      - name: rune_pool_withdraw_events
+      - name: scheduled_outbound_events
+      - name: secure_asset_deposit_events
+      - name: secure_asset_withdraw_events
+      - name: send_messages
+      - name: set_ip_address_events
+      - name: set_mimir_events
+      - name: set_node_keys_events
+      - name: set_node_mimir_events
+      - name: set_version_events
+      - name: slash_events
+      - name: slash_points_events
+      - name: stake_events
+      - name: streaming_swap_details_events
+      - name: swap_events
+      - name: switch_events
+      - name: tcy_claim_events
+      - name: tcy_distribution_events
+      - name: tcy_stake_events
+      - name: tcy_unstake_events
+      - name: thorname_change_events
+      - name: trade_account_deposit_events
+      - name: trade_account_withdraw_events
+      - name: transfer_events
+      - name: tss_keygen_failure_events
+      - name: tss_keygen_success_events
+      - name: update_node_account_status_events
+      - name: validator_request_leave_events
+      - name: wasm_contracts_events
+      - name: withdraw_events
+  - name: midgard_agg
+    description: Aggregates Midgard builds for its own API. Used only to check that the clean tables agree with Midgard.
+    schema: midgard_agg
+    tables:
+      - name: swaps_day

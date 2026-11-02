@@ -1,0 +1,27 @@
+name: thorchain_data
+version: "0.1.0"
+config-version: 2
+profile: thorchain_data
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+
+models:
+  thorchain_data:
+    events:
+      +schema: events
+      +materialized: view
+    core:
+      +schema: core
+      +materialized: table
+    daily:
+      +schema: daily
+      +materialized: table
+    legacy:
+      +schema: legacy
+      +materialized: view
+
+data_tests:
+  thorchain_data:
+    +severity: error

@@ -1,0 +1,248 @@
+version: 2
+
+models:
+  - name: daily__affiliates
+    description: "One row per affiliate per day with swaps or fee payments. Swaps with several affiliates count towards each."
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [day, affiliate]
+    columns:
+      - name: day
+        description: "{{ doc('day') }}"
+        data_tests:
+          - not_null
+          - no_missing_days
+      - name: affiliate
+        description: "{{ doc('affiliate') }}"
+        data_tests:
+          - not_null
+      - name: swap_count
+        description: "Number of user swaps with this affiliate that started on the day."
+        data_tests:
+          - not_negative
+      - name: unique_swappers
+        description: "Number of distinct addresses that swapped with this affiliate."
+      - name: user_volume_usd
+        description: "Input value of those swaps in USD, each swap counted once."
+      - name: swap_volume_usd
+        description: "Swap volume of those swaps in USD, every pool leg counted."
+      - name: fee_payment_count
+        description: "Number of affiliate fee payments."
+      - name: affiliate_fee
+        description: "Affiliate fees paid, in RUNE."
+      - name: affiliate_fee_e8
+        description: "`affiliate_fee` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: affiliate_fee_usd
+        description: "`affiliate_fee` in USD: the sum of values priced at each event's block."
+  - name: daily__network
+    description: "One row per day for the whole network, every day from the first to the last indexed block. Flows are totals for the day; balances and prices are as of the end of the day."
+    columns:
+      - name: day
+        description: "{{ doc('day') }}"
+        data_tests:
+          - unique
+          - not_null
+          - no_missing_days
+      - name: rune_price_usd
+        description: "{{ doc('rune_price_usd') }}"
+        data_tests:
+          - not_negative
+      - name: swap_count
+        description: "Number of user swaps that started on the day."
+        data_tests:
+          - not_negative
+      - name: unique_swappers
+        description: "Number of distinct addresses that swapped on the day."
+        data_tests:
+          - not_negative
+      - name: user_volume_usd
+        description: "{{ doc('user_volume_usd') }}"
+      - name: swap_volume
+        description: "{{ doc('swap_volume') }}"
+      - name: swap_volume_e8
+        description: "`swap_volume` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: swap_volume_usd
+        description: "{{ doc('swap_volume_usd') }}"
+      - name: liquidity_fee
+        description: "{{ doc('liquidity_fee') }}"
+      - name: liquidity_fee_e8
+        description: "`liquidity_fee` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: liquidity_fee_usd
+        description: "`liquidity_fee` in USD: the sum of values priced at each event's block."
+      - name: pool_rewards
+        description: "{{ doc('pool_rewards') }}"
+      - name: pool_rewards_e8
+        description: "`pool_rewards` as a raw chain integer (1e-8 units)."
+      - name: pool_rewards_usd
+        description: "`pool_rewards` in USD: the sum of values priced at each event's block."
+      - name: bond_rewards
+        description: "{{ doc('bond_rewards') }}"
+      - name: bond_rewards_e8
+        description: "`bond_rewards` as a raw chain integer (1e-8 units)."
+      - name: bond_rewards_usd
+        description: "`bond_rewards` in USD: the sum of values priced at each event's block."
+      - name: block_rewards
+        description: "{{ doc('block_rewards') }}"
+      - name: block_rewards_e8
+        description: "`block_rewards` as a raw chain integer (1e-8 units)."
+      - name: block_rewards_usd
+        description: "`block_rewards` in USD: the sum of values priced at each event's block."
+      - name: liquidity_earnings
+        description: "{{ doc('liquidity_earnings') }}"
+      - name: liquidity_earnings_e8
+        description: "`liquidity_earnings` as a raw chain integer (1e-8 units)."
+      - name: liquidity_earnings_usd
+        description: "`liquidity_earnings` in USD: the sum of values priced at each event's block."
+      - name: earnings
+        description: "{{ doc('earnings') }}"
+      - name: earnings_e8
+        description: "`earnings` as a raw chain integer (1e-8 units)."
+      - name: earnings_usd
+        description: "`earnings` in USD: the sum of values priced at each event's block."
+      - name: total_value_pooled
+        description: "{{ doc('total_value_pooled') }}"
+      - name: total_value_pooled_e8
+        description: "`total_value_pooled` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: total_value_pooled_usd
+        description: "`total_value_pooled` in USD, at the end-of-day RUNE price."
+      - name: total_value_bonded
+        description: "{{ doc('total_value_bonded') }}"
+      - name: total_value_bonded_e8
+        description: "`total_value_bonded` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: total_value_bonded_usd
+        description: "`total_value_bonded` in USD, at the end-of-day RUNE price."
+      - name: total_value_locked
+        description: "{{ doc('total_value_locked') }}"
+      - name: total_value_locked_e8
+        description: "`total_value_locked` as a raw chain integer (1e-8 units)."
+      - name: total_value_locked_usd
+        description: "`total_value_locked` in USD, at the end-of-day RUNE price."
+      - name: active_nodes
+        description: "Number of Active nodes at the end of the day."
+        data_tests:
+          - not_negative
+  - name: daily__pools
+    description: "One row per pool per day, every day from the pool's first depth record until the last indexed day (or the pool's last record, if it was emptied). Flows are totals for the day; depths, units and prices are as of the end of the day. Saver (synth) positions are not included."
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [day, pool]
+    columns:
+      - name: day
+        description: "{{ doc('day') }}"
+        data_tests:
+          - not_null
+          - no_missing_days:
+              arguments:
+                group_by: pool
+      - name: pool
+        description: "{{ doc('pool') }}"
+        data_tests:
+          - not_null
+      - name: asset_depth
+        description: "Asset held by the pool at the end of the day, real units."
+      - name: asset_depth_e8
+        description: "`asset_depth` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: rune_depth
+        description: "RUNE held by the pool at the end of the day, real units."
+      - name: rune_depth_e8
+        description: "`rune_depth` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: synth_depth
+        description: "Synths of the pool's asset in circulation at the end of the day, real units."
+      - name: synth_depth_e8
+        description: "`synth_depth` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: asset_price
+        description: "{{ doc('asset_price') }}"
+        data_tests:
+          - not_negative
+      - name: asset_price_usd
+        description: "{{ doc('asset_price_usd') }}"
+      - name: total_value_pooled
+        description: "{{ doc('total_value_pooled') }}"
+      - name: total_value_pooled_e8
+        description: "`total_value_pooled` as a raw chain integer (1e-8 units)."
+      - name: total_value_pooled_usd
+        description: "`total_value_pooled` in USD, at the end-of-day RUNE price."
+      - name: liquidity_units
+        description: "Liquidity units of the pool at the end of the day: the running total of units issued and burned."
+        data_tests:
+          - not_negative
+      - name: swap_count
+        description: "Number of user swaps that started on the day with a leg in this pool."
+        data_tests:
+          - not_negative
+      - name: unique_swappers
+        description: "Number of distinct addresses with a swap leg in this pool on the day."
+      - name: swap_volume
+        description: "{{ doc('swap_volume') }}"
+      - name: swap_volume_e8
+        description: "`swap_volume` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: swap_volume_usd
+        description: "{{ doc('swap_volume_usd') }}"
+      - name: liquidity_fee
+        description: "{{ doc('liquidity_fee') }}"
+      - name: liquidity_fee_e8
+        description: "`liquidity_fee` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: liquidity_fee_usd
+        description: "`liquidity_fee` in USD: the sum of values priced at each event's block."
+      - name: pool_rewards
+        description: "{{ doc('pool_rewards') }}"
+      - name: pool_rewards_e8
+        description: "`pool_rewards` as a raw chain integer (1e-8 units)."
+      - name: pool_rewards_usd
+        description: "`pool_rewards` in USD: the sum of values priced at each event's block."
+      - name: add_count
+        description: "Number of liquidity adds."
+      - name: rune_added
+        description: "RUNE added, real units."
+      - name: rune_added_e8
+        description: "`rune_added` as a raw chain integer (1e-8 units)."
+      - name: rune_added_usd
+        description: "`rune_added` in USD: the sum of values priced at each event's block."
+      - name: asset_added
+        description: "Asset added, real units."
+      - name: asset_added_e8
+        description: "`asset_added` as a raw chain integer (1e-8 units)."
+      - name: asset_added_usd
+        description: "`asset_added` in USD: the sum of values priced at each event's block."
+      - name: withdraw_count
+        description: "Number of liquidity withdrawals."
+      - name: rune_withdrawn
+        description: "RUNE paid out to withdrawing providers, real units."
+      - name: rune_withdrawn_e8
+        description: "`rune_withdrawn` as a raw chain integer (1e-8 units)."
+      - name: rune_withdrawn_usd
+        description: "`rune_withdrawn` in USD: the sum of values priced at each event's block."
+      - name: asset_withdrawn
+        description: "Asset paid out to withdrawing providers, real units."
+      - name: asset_withdrawn_e8
+        description: "`asset_withdrawn` as a raw chain integer (1e-8 units)."
+      - name: asset_withdrawn_usd
+        description: "`asset_withdrawn` in USD: the sum of values priced at each event's block."
+      - name: impermanent_loss_protection
+        description: "Impermanent loss protection paid, in RUNE."
+      - name: impermanent_loss_protection_e8
+        description: "`impermanent_loss_protection` as a raw chain integer (1e-8 units)."
+      - name: impermanent_loss_protection_usd
+        description: "`impermanent_loss_protection` in USD: the sum of values priced at each event's block."

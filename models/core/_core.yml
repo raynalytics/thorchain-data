@@ -1,0 +1,422 @@
+version: 2
+
+models:
+  - name: core__affiliate_fees
+    description: "One row per affiliate fee payment (one `affiliate_fee` event)."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: day
+        description: "{{ doc('day') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: affiliate
+        description: "{{ doc('affiliate') }}"
+      - name: thorname
+        description: "Affiliate's THORName, if it has one."
+      - name: affiliate_address
+        description: "THORChain address the fee is paid to."
+      - name: affiliate_fee_bps
+        description: "Affiliate fee rate, in basis points."
+      - name: asset
+        description: "Asset the fee was taken in."
+      - name: gross_amount
+        description: "Swap amount the fee was taken from, real units of `asset`."
+      - name: gross_amount_e8
+        description: "`gross_amount` as a raw chain integer (1e-8 units)."
+      - name: fee_amount
+        description: "Fee taken, real units of `asset`."
+      - name: fee_amount_e8
+        description: "`fee_amount` as a raw chain integer (1e-8 units)."
+      - name: affiliate_fee
+        description: "Fee paid, in RUNE."
+      - name: affiliate_fee_e8
+        description: "`affiliate_fee` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: affiliate_fee_usd
+        description: "`affiliate_fee` in USD, priced at the block of the event."
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: core__blocks
+    description: "One row per indexed block."
+    columns:
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: day
+        description: "{{ doc('day') }}"
+      - name: block_hash
+        description: "Block hash, hex."
+  - name: core__earnings
+    description: "One row per block: liquidity fees, block rewards and earnings, as Midgard's earnings history defines them."
+    columns:
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: day
+        description: "{{ doc('day') }}"
+      - name: liquidity_fee
+        description: "{{ doc('liquidity_fee') }}"
+      - name: liquidity_fee_e8
+        description: "`liquidity_fee` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: liquidity_fee_usd
+        description: "`liquidity_fee` in USD, priced at the block of the event."
+      - name: pool_rewards
+        description: "{{ doc('pool_rewards') }}"
+      - name: pool_rewards_e8
+        description: "`pool_rewards` as a raw chain integer (1e-8 units)."
+      - name: pool_rewards_usd
+        description: "`pool_rewards` in USD, priced at the block of the event."
+      - name: bond_rewards
+        description: "{{ doc('bond_rewards') }}"
+      - name: bond_rewards_e8
+        description: "`bond_rewards` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: bond_rewards_usd
+        description: "`bond_rewards` in USD, priced at the block of the event."
+      - name: block_rewards
+        description: "{{ doc('block_rewards') }}"
+      - name: block_rewards_e8
+        description: "`block_rewards` as a raw chain integer (1e-8 units)."
+      - name: block_rewards_usd
+        description: "`block_rewards` in USD, priced at the block of the event."
+      - name: liquidity_earnings
+        description: "{{ doc('liquidity_earnings') }}"
+      - name: liquidity_earnings_e8
+        description: "`liquidity_earnings` as a raw chain integer (1e-8 units)."
+      - name: liquidity_earnings_usd
+        description: "`liquidity_earnings` in USD, priced at the block of the event."
+      - name: earnings
+        description: "{{ doc('earnings') }}"
+      - name: earnings_e8
+        description: "`earnings` as a raw chain integer (1e-8 units)."
+      - name: earnings_usd
+        description: "`earnings` in USD, priced at the block of the event."
+      - name: rune_price_usd
+        description: "{{ doc('rune_price_usd') }}"
+  - name: core__liquidity_actions
+    description: "One row per liquidity add or withdrawal, with USD values."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: day
+        description: "{{ doc('day') }}"
+      - name: action
+        description: "`add` or `withdraw`."
+      - name: pool
+        description: "{{ doc('pool') }}"
+      - name: tx_id
+        description: "Hash of the add (asset side if both sides were sent) or withdrawal transaction."
+      - name: rune_address
+        description: "Provider's THORChain address, where known."
+      - name: asset_address
+        description: "Provider's address on the asset's chain, where known."
+      - name: rune_amount
+        description: "RUNE added or paid out, real units."
+      - name: rune_amount_e8
+        description: "`rune_amount` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: rune_amount_usd
+        description: "`rune_amount` in USD, priced at the block of the event."
+      - name: asset_amount
+        description: "Asset added or paid out, real units."
+      - name: asset_amount_e8
+        description: "`asset_amount` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: asset_amount_usd
+        description: "`asset_amount` in USD, priced at the block of the event."
+      - name: total_value_usd
+        description: "`rune_amount_usd` + `asset_amount_usd`."
+      - name: liquidity_units_change
+        description: "Liquidity units issued (positive) or burned (negative)."
+      - name: basis_points
+        description: "For withdrawals, the share of the position withdrawn, in basis points (10000 = all)."
+      - name: asymmetry
+        description: "For withdrawals, the asymmetry: 0 for both sides, towards -1 or 1 for one side."
+      - name: impermanent_loss_protection
+        description: "Impermanent loss protection paid on a withdrawal, in RUNE."
+      - name: impermanent_loss_protection_e8
+        description: "`impermanent_loss_protection` as a raw chain integer (1e-8 units)."
+      - name: impermanent_loss_protection_usd
+        description: "`impermanent_loss_protection` in USD, priced at the block of the event."
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: core__node_status_changes
+    description: "One row per node status change (one `UpdateNodeAccountStatus` event)."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: day
+        description: "{{ doc('day') }}"
+      - name: node_address
+        description: "{{ doc('node_address') }}"
+      - name: previous_status
+        description: "Status before the change, e.g. `Standby`, `Ready`, `Active`, `Disabled`."
+      - name: status
+        description: "Status after the change."
+      - name: active_node_change
+        description: "+1 when the node became Active, -1 when it stopped being Active, otherwise 0."
+  - name: core__pool_depths
+    description: "One row per pool per block in which the pool's depths changed: the depths at the end of that block."
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [pool, block_height]
+    columns:
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+        data_tests:
+          - not_null
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: day
+        description: "{{ doc('day') }}"
+      - name: pool
+        description: "{{ doc('pool') }}"
+        data_tests:
+          - not_null
+      - name: asset_depth
+        description: "Asset held by the pool, real units."
+      - name: asset_depth_e8
+        description: "`asset_depth` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: rune_depth
+        description: "RUNE held by the pool, real units."
+      - name: rune_depth_e8
+        description: "`rune_depth` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: synth_depth
+        description: "Synths of the pool's asset in circulation, real units."
+      - name: synth_depth_e8
+        description: "`synth_depth` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: asset_price
+        description: "{{ doc('asset_price') }}"
+        data_tests:
+          - not_negative
+      - name: asset_price_usd
+        description: "{{ doc('asset_price_usd') }}"
+        data_tests:
+          - not_negative
+  - name: core__rune_price
+    description: "One row per block: RUNE's USD price at that block."
+    columns:
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: day
+        description: "{{ doc('day') }}"
+      - name: rune_price_usd
+        description: "{{ doc('rune_price_usd') }}"
+        data_tests:
+          - not_negative
+      - name: is_price_recorded
+        description: "False when Midgard had no usable price anchor in the block and the last recorded price is used."
+  - name: core__swap_legs
+    description: "One row per pool leg of a swap (one `swap` event), with volume and USD values. A swap routed through RUNE has two legs; streaming swaps have one or two per sub-swap."
+    columns:
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "{{ doc('block_height') }}"
+      - name: block_time
+        description: "{{ doc('block_time') }}"
+      - name: day
+        description: "{{ doc('day') }}"
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+      - name: chain
+        description: "{{ doc('chain') }}"
+      - name: pool
+        description: "{{ doc('pool') }}"
+      - name: direction
+        description: "Direction of the leg: `rune_to_asset`, `asset_to_rune`, `rune_to_synth`, `synth_to_rune`, `rune_to_trade`, `trade_to_rune`, `rune_to_secured`, `secured_to_rune`, `rune_to_derived` or `derived_to_rune`."
+      - name: from_address
+        description: "{{ doc('from_address') }}"
+      - name: to_address
+        description: "Inbound vault address the swap was sent to. The user's destination is in the memo."
+      - name: from_asset
+        description: "Asset going into the pool on this leg."
+      - name: from_amount
+        description: "Amount going into the pool, real units."
+      - name: from_amount_e8
+        description: "`from_amount` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: from_amount_usd
+        description: "`from_amount` in USD, priced at the block of the event."
+      - name: to_asset
+        description: "Asset coming out of the pool on this leg."
+      - name: to_amount
+        description: "Amount coming out of the pool after the liquidity fee, real units."
+      - name: to_amount_e8
+        description: "`to_amount` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: to_amount_usd
+        description: "`to_amount` in USD, priced at the block of the event."
+      - name: liquidity_fee
+        description: "{{ doc('liquidity_fee') }}"
+      - name: liquidity_fee_e8
+        description: "`liquidity_fee` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: liquidity_fee_usd
+        description: "`liquidity_fee` in USD, priced at the block of the event."
+      - name: swap_slip_bps
+        description: "Price slip of the leg in basis points."
+      - name: swap_volume
+        description: "{{ doc('swap_volume') }}"
+      - name: swap_volume_e8
+        description: "`swap_volume` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: swap_volume_usd
+        description: "{{ doc('swap_volume_usd') }}"
+      - name: is_streaming
+        description: "True when the leg is part of a streaming swap."
+      - name: streaming_count
+        description: "For streaming swaps, the number of the sub-swap this leg belongs to."
+      - name: streaming_quantity
+        description: "For streaming swaps, the number of sub-swaps planned."
+      - name: asset_price_usd
+        description: "{{ doc('asset_price_usd') }}"
+      - name: rune_price_usd
+        description: "{{ doc('rune_price_usd') }}"
+      - name: tx_type
+        description: "{{ doc('tx_type') }}"
+      - name: memo
+        description: "{{ doc('memo') }}"
+  - name: core__swaps
+    description: "One row per user swap, however many pool legs or streaming sub-swaps it took. Legs are grouped by inbound transaction. When an affiliate fee is swapped to RUNE inside the same transaction, its leg is included."
+    columns:
+      - name: tx_id
+        description: "{{ doc('tx_id') }}"
+        data_tests:
+          - unique
+          - not_null
+      - name: block_height
+        description: "Block height of the swap's first leg."
+      - name: block_time
+        description: "Time of the swap's first leg, UTC."
+      - name: day
+        description: "UTC date of the swap's first leg."
+      - name: end_block_height
+        description: "Block height of the swap's last leg."
+      - name: end_block_time
+        description: "Time of the swap's last leg, UTC."
+      - name: chain
+        description: "Chain the swap came in on."
+      - name: from_address
+        description: "Address that sent the swap."
+      - name: to_address
+        description: "Destination address from the swap memo."
+      - name: from_asset
+        description: "Asset the user swapped from."
+      - name: from_amount
+        description: "Amount swapped in, real units."
+      - name: from_amount_e8
+        description: "`from_amount` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: from_amount_usd
+        description: "`from_amount` in USD, priced at the block of the event."
+      - name: to_asset
+        description: "Asset the user swapped to."
+      - name: to_amount
+        description: "Amount paid out by the pools, real units."
+      - name: to_amount_e8
+        description: "`to_amount` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: to_amount_usd
+        description: "`to_amount` in USD, priced at the block of the event."
+      - name: user_volume_usd
+        description: "{{ doc('user_volume_usd') }}"
+      - name: swap_volume
+        description: "{{ doc('swap_volume') }}"
+      - name: swap_volume_e8
+        description: "`swap_volume` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: swap_volume_usd
+        description: "{{ doc('swap_volume_usd') }}"
+      - name: liquidity_fee
+        description: "{{ doc('liquidity_fee') }}"
+      - name: liquidity_fee_e8
+        description: "`liquidity_fee` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: liquidity_fee_usd
+        description: "`liquidity_fee` in USD, priced at the block of the event."
+      - name: liquidity_fee_bps
+        description: "Liquidity fee as a share of the input value, in basis points."
+      - name: affiliate
+        description: "First affiliate of the swap."
+      - name: affiliates
+        description: "All affiliates of the swap, in order (from affiliate fee events where present, otherwise from the memo)."
+      - name: affiliate_fee_bps
+        description: "Total affiliate fee rate, in basis points."
+      - name: affiliate_fee
+        description: "Total affiliate fees paid on the swap, in RUNE."
+      - name: affiliate_fee_e8
+        description: "`affiliate_fee` as a raw chain integer (1e-8 units)."
+      - name: affiliate_fee_usd
+        description: "`affiliate_fee` in USD, priced at the block of the event."
+      - name: leg_count
+        description: "Number of pool legs."
+        data_tests:
+          - not_negative
+      - name: is_streaming
+        description: "True for streaming swaps."
+      - name: streaming_quantity
+        description: "For streaming swaps, the number of sub-swaps planned."
+      - name: tx_type
+        description: "{{ doc('tx_type') }}"
+      - name: memo
+        description: "{{ doc('memo') }}"
