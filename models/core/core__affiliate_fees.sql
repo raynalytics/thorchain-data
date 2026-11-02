@@ -29,7 +29,10 @@ swap_inputs as (
         min(legs.block_height) as block_height,
         min(legs.block_time) as block_time,
         firsts.from_asset,
+        firsts.from_address,
+        firsts.to_address,
         firsts.memo,
+        bool_or(legs.is_streaming) as is_streaming,
         sum(legs.from_amount_e8) filter (where legs.from_asset = firsts.from_asset) as from_amount_e8,
         sum(legs.swap_volume_e8) filter (where legs.from_asset = firsts.from_asset) as input_value_e8,
         sum(legs.from_amount_usd) filter (where legs.from_asset = firsts.from_asset) as input_value_usd
@@ -39,6 +42,8 @@ swap_inputs as (
             tx_id,
             event_id,
             from_asset,
+            from_address,
+            to_address,
             memo
         from {{ ref('core__swap_legs') }}
         where leg_type = 'user'
@@ -48,23 +53,7 @@ swap_inputs as (
     where legs.leg_type = 'user'
         and firsts.event_id < coalesce((select min(event_id) from recorded), 9223372036854775807)
         and not exists (select 1 from recorded where recorded.tx_id = legs.tx_id)
-    group by legs.tx_id, firsts.from_asset, firsts.memo
-),
-
--- Before affiliate fee events exist, THORChain skimmed the fee from the input and swapped it to RUNE
--- in a leg of its own (one per transaction); the RUNE it produced is the fee paid.
-fee_legs as (
-    select
-        tx_id,
-        event_id,
-        block_height,
-        block_time,
-        from_amount_e8,
-        to_amount_e8,
-        to_amount_usd
-    from {{ ref('core__swap_legs') }}
-    where leg_type = 'affiliate_fee'
-        and tx_id in (select tx_id from swap_inputs)
+    group by legs.tx_id, firsts.from_asset, firsts.from_address, firsts.to_address, firsts.memo
 ),
 
 -- The memo lists affiliates and their basis points, separated by '/'.
@@ -92,6 +81,9 @@ memo_fees as (
         min(block_height) as swap_block_height,
         min(block_time) as swap_block_time,
         min(from_asset) as from_asset,
+        min(from_address) as from_address,
+        min(to_address) as to_address,
+        bool_or(is_streaming) as is_streaming,
         min(from_amount_e8) as from_amount_e8,
         min(input_value_e8) as input_value_e8,
         min(input_value_usd) as input_value_usd,
@@ -101,41 +93,131 @@ memo_fees as (
     group by tx_id, affiliate
 ),
 
--- Where a fee leg exists, its fee is shared among the memo's affiliates by basis points (in practice
--- these memos name one affiliate). Otherwise the fee is estimated as basis points × the input.
+-- Before affiliate fee events exist, THORChain took the fee from the input before swapping, so the
+-- full input is the user legs plus the fee:
+-- - for inputs from other chains, the fee was swapped to RUNE in a leg of its own (one per transaction);
+--   the RUNE that leg produced is the fee paid.
+-- - for RUNE deposited on THORChain, the fee was sent straight from the Asgard module to the affiliate
+--   in the deposit's own transaction. The deposit is the user's transfer of the full input to Asgard
+--   (in the swap's first block, or a few blocks earlier when the swap queue was full) whose amount less
+--   floor(basis points × amount / 10000) is the swapped input; the payment is Asgard's transfer of at
+--   most that fee in the same transaction (early versions also deducted the network fee from it).
+fee_legs as (
+    select
+        legs.tx_id,
+        legs.event_id,
+        legs.block_height,
+        legs.block_time,
+        swaps.from_amount_e8 + legs.from_amount_e8 as gross_amount_e8,
+        legs.from_amount_e8 as fee_amount_e8,
+        legs.to_amount_e8 as affiliate_fee_e8,
+        legs.to_amount_usd as affiliate_fee_usd
+    from {{ ref('core__swap_legs') }} as legs
+    inner join swap_inputs as swaps
+        on swaps.tx_id = legs.tx_id
+    where legs.leg_type = 'affiliate_fee'
+),
+
+rune_swaps as (
+    select distinct on (tx_id)
+        tx_id,
+        from_address,
+        to_address,
+        swap_block_height,
+        is_streaming,
+        from_amount_e8,
+        total_fee_bps
+    from memo_fees
+    where from_asset = 'THOR.RUNE'
+    order by tx_id
+),
+
+rune_deposits as (
+    select distinct on (swaps.tx_id)
+        swaps.tx_id,
+        deposits.event_id,
+        deposits.block_height,
+        deposits.amount_e8 as gross_amount_e8,
+        floor(deposits.amount_e8 * swaps.total_fee_bps / 10000) as fee_due_e8
+    from rune_swaps as swaps
+    inner join {{ ref('events__transfers') }} as deposits
+        on deposits.from_address = swaps.from_address
+        and deposits.to_address = swaps.to_address
+        and deposits.asset = 'THOR.RUNE'
+        and deposits.block_height between swaps.swap_block_height - 10 and swaps.swap_block_height
+    where case
+        when swaps.is_streaming
+            then deposits.amount_e8 - floor(deposits.amount_e8 * swaps.total_fee_bps / 10000) >= swaps.from_amount_e8 - 1
+        else abs(deposits.amount_e8 - floor(deposits.amount_e8 * swaps.total_fee_bps / 10000) - swaps.from_amount_e8) <= 1
+    end
+    order by swaps.tx_id, deposits.event_id desc
+),
+
+rune_payments as (
+    select distinct on (deposits.tx_id)
+        deposits.tx_id,
+        payments.event_id,
+        payments.block_height,
+        payments.block_time,
+        deposits.gross_amount_e8,
+        payments.amount_e8 as fee_amount_e8,
+        payments.amount_e8 as affiliate_fee_e8,
+        payments.amount * prices.rune_price_usd as affiliate_fee_usd
+    from rune_deposits as deposits
+    inner join rune_swaps as swaps
+        on swaps.tx_id = deposits.tx_id
+    inner join {{ ref('events__transfers') }} as payments
+        on payments.block_height = deposits.block_height
+        and payments.event_id / 10000 = deposits.event_id / 10000
+        and payments.from_address = swaps.to_address
+        and payments.asset = 'THOR.RUNE'
+        and payments.amount_e8 between 1 and deposits.fee_due_e8 + 1
+    left join {{ ref('core__rune_price') }} as prices
+        on prices.block_height = payments.block_height
+    order by deposits.tx_id, payments.amount_e8 desc
+),
+
+fees_paid as (
+    select * from fee_legs
+    union all
+    select * from rune_payments
+),
+
+-- A fee paid is shared among the memo's affiliates by basis points (in practice these memos name one
+-- affiliate). Where none was found, the fee is estimated as basis points × the input.
 memo_era as (
     select
-        coalesce(fee_legs.event_id, memo_fees.swap_event_id) as event_id,
-        coalesce(fee_legs.block_height, memo_fees.swap_block_height) as block_height,
-        coalesce(fee_legs.block_time, memo_fees.swap_block_time) as block_time,
-        (coalesce(fee_legs.block_time, memo_fees.swap_block_time) at time zone 'UTC')::date as day,
+        coalesce(paid.event_id, memo_fees.swap_event_id) as event_id,
+        coalesce(paid.block_height, memo_fees.swap_block_height) as block_height,
+        coalesce(paid.block_time, memo_fees.swap_block_time) as block_time,
+        (coalesce(paid.block_time, memo_fees.swap_block_time) at time zone 'UTC')::date as day,
         memo_fees.tx_id,
         memo_fees.affiliate,
         case when memo_fees.affiliate not like 'thor1%' then memo_fees.affiliate end as thorname,
         case when memo_fees.affiliate like 'thor1%' then memo_fees.affiliate end as affiliate_address,
         memo_fees.affiliate_fee_bps::bigint as affiliate_fee_bps,
         memo_fees.from_asset as asset,
-        (memo_fees.from_amount_e8 + coalesce(fee_legs.from_amount_e8, 0))::bigint as gross_amount_e8,
+        coalesce(paid.gross_amount_e8, memo_fees.from_amount_e8)::bigint as gross_amount_e8,
         case
-            when fee_legs.event_id is not null
-                then floor(fee_legs.from_amount_e8 * memo_fees.affiliate_fee_bps / memo_fees.total_fee_bps)
+            when paid.event_id is not null
+                then floor(paid.fee_amount_e8 * memo_fees.affiliate_fee_bps / memo_fees.total_fee_bps)
             else floor(memo_fees.affiliate_fee_bps * memo_fees.from_amount_e8 / 10000)
         end::bigint as fee_amount_e8,
         case
-            when fee_legs.event_id is not null
-                then floor(fee_legs.to_amount_e8 * memo_fees.affiliate_fee_bps / memo_fees.total_fee_bps)
+            when paid.event_id is not null
+                then floor(paid.affiliate_fee_e8 * memo_fees.affiliate_fee_bps / memo_fees.total_fee_bps)
             else floor(memo_fees.affiliate_fee_bps * memo_fees.input_value_e8 / 10000)
         end::bigint as affiliate_fee_e8,
         case
-            when fee_legs.event_id is not null
-                then fee_legs.to_amount_usd * memo_fees.affiliate_fee_bps / memo_fees.total_fee_bps
+            when paid.event_id is not null
+                then paid.affiliate_fee_usd * memo_fees.affiliate_fee_bps / memo_fees.total_fee_bps
             else memo_fees.affiliate_fee_bps * memo_fees.input_value_usd / 10000
         end as affiliate_fee_usd,
         memo_fees.memo,
-        fee_legs.event_id is null as is_estimated
+        paid.event_id is null as is_estimated
     from memo_fees
-    left join fee_legs
-        on fee_legs.tx_id = memo_fees.tx_id
+    left join fees_paid as paid
+        on paid.tx_id = memo_fees.tx_id
 ),
 
 fees as (

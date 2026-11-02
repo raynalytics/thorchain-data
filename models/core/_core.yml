@@ -2,14 +2,14 @@ version: 2
 
 models:
   - name: core__affiliate_fees
-    description: "One row per affiliate fee on a swap. Since affiliate fee events exist, one row per `affiliate_fee` event. Before that, one row per affiliate named in a user swap's memo with a fee rate above zero: the RUNE produced by the fee leg THORChain swapped in the user's transaction or, where no fee leg exists, an estimate of basis points × the swap's input value (`is_estimated`)."
+    description: "One row per affiliate fee on a swap. Since affiliate fee events exist, one row per `affiliate_fee` event. Before that, one row per affiliate named in a user swap's memo with a fee rate above zero: the RUNE produced by the fee leg THORChain swapped in the user's transaction, or for swaps from RUNE the RUNE THORChain sent the affiliate. Where neither is found, an estimate of basis points × the swap's input value (`is_estimated`)."
     data_tests:
       - unique_key:
           arguments:
             columns: [event_id, affiliate]
     columns:
       - name: event_id
-        description: "Midgard's identifier for the `affiliate_fee` event; before those exist, the event of the fee leg, or for estimated fees of the swap's first leg."
+        description: "Midgard's identifier for the `affiliate_fee` event; before those exist, the event of the fee leg or of the RUNE payment, or for estimated fees of the swap's first leg."
         data_tests:
           - not_null
       - name: block_height
@@ -33,17 +33,17 @@ models:
       - name: asset
         description: "Asset the fee was taken in. Before affiliate fee events exist, the swap's input asset."
       - name: gross_amount
-        description: "Swap amount the fee was taken from, real units of `asset`. Before affiliate fee events exist, the user's full input."
+        description: "Swap amount the fee was taken from, real units of `asset`. Before affiliate fee events exist, the user's full input (for swaps from RUNE, the amount deposited); for estimated fees, the swapped input."
       - name: gross_amount_e8
         description: "`gross_amount` as a raw chain integer (1e-8 units)."
       - name: fee_amount
-        description: "Fee taken, real units of `asset`. Before affiliate fee events exist, what the fee leg sold or, for estimated fees, basis points × `gross_amount`."
+        description: "Fee taken, real units of `asset`. Before affiliate fee events exist, what the fee leg sold, or for swaps from RUNE the RUNE paid; for estimated fees, basis points × `gross_amount`."
       - name: fee_amount_e8
         description: "`fee_amount` as a raw chain integer (1e-8 units)."
         data_tests:
           - not_negative
       - name: affiliate_fee
-        description: "Fee in RUNE. Before affiliate fee events exist, the RUNE the fee leg produced or, for estimated fees, basis points × the swap's input value in RUNE."
+        description: "Fee in RUNE. Before affiliate fee events exist, the RUNE the fee leg produced, or for swaps from RUNE the RUNE paid to the affiliate; for estimated fees, basis points × the swap's input value in RUNE."
       - name: affiliate_fee_e8
         description: "`affiliate_fee` as a raw chain integer (1e-8 units)."
         data_tests:
@@ -51,7 +51,7 @@ models:
       - name: affiliate_fee_usd
         description: "`affiliate_fee` in USD, priced at the block of the event."
       - name: is_estimated
-        description: "True when the fee is estimated from the swap memo: before affiliate fee events exist, for swaps where no fee leg was found (including swaps from RUNE, whose fee was paid without a swap)."
+        description: "True when the fee is estimated from the swap memo: before affiliate fee events exist, for swaps where neither a fee leg nor a RUNE payment was found (for example swaps from synths or trade assets, whose fee was paid in that asset)."
       - name: memo
         description: "{{ doc('memo') }}"
   - name: core__blocks
@@ -375,7 +375,7 @@ models:
       - name: from_asset
         description: "Asset the user swapped from."
       - name: from_amount
-        description: "Amount swapped in by the user's legs, real units. Before affiliate fee events exist, the affiliate fee was taken from the input first and is not included."
+        description: "Full amount the user swapped in, before any affiliate fee, real units. Before affiliate fee events exist, the fee was taken from the input and sold in its own leg, which is included. Swaps from RUNE deposited on THORChain paid that fee by transfer instead; as in Midgard, it is not included (see `core.affiliate_fees.gross_amount`)."
       - name: from_amount_e8
         description: "`from_amount` as a raw chain integer (1e-8 units)."
         data_tests:
@@ -425,7 +425,7 @@ models:
       - name: affiliate_fee_usd
         description: "`affiliate_fee` in USD, priced at the block of the event."
       - name: is_affiliate_fee_estimated
-        description: "True when the affiliate fees are estimated from the memo (swaps before affiliate fee events exist with no fee leg found); null when the swap has no affiliate fee."
+        description: "True when the affiliate fees are estimated from the memo (swaps before affiliate fee events exist where no fee payment was found); null when the swap has no affiliate fee."
       - name: leg_count
         description: "Number of pool legs in the transaction, affiliate fee legs included."
         data_tests:

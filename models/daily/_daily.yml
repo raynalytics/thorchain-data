@@ -37,7 +37,7 @@ models:
       - name: affiliate_fee_usd
         description: "`affiliate_fee` in USD: the sum of values priced at each event's block."
       - name: is_affiliate_fee_estimated
-        description: "True when any of the day's affiliate fees are estimated from swap memos (no fee leg found)."
+        description: "True when any of the day's affiliate fees are estimated from swap memos (no fee payment found)."
   - name: daily__network
     description: "One row per day for the whole network, every day from the first to the last indexed block. Flows are totals for the day; balances and prices are as of the end of the day."
     columns:

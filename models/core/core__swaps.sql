@@ -45,12 +45,12 @@ swap_ends as (
 
 -- Before affiliate fee events exist, the fee was skimmed from the input and sold in its own leg, so the
 -- full input is the user legs plus that leg. Later fee legs sell the output asset and are left out.
+-- (RUNE deposited on THORChain paid its fee by transfer, not a leg; as in Midgard, it is not added.)
 swap_amounts as (
     select
         swap_ends.tx_id,
-        sum(legs.from_amount_e8) filter (where legs.leg_type = 'user' and legs.from_asset = swap_ends.from_asset)::bigint as from_amount_e8,
-        sum(legs.from_amount_usd) filter (where legs.leg_type = 'user' and legs.from_asset = swap_ends.from_asset) as from_amount_usd,
-        sum(legs.from_amount_usd) filter (where legs.from_asset = swap_ends.from_asset) as user_volume_usd,
+        sum(legs.from_amount_e8) filter (where legs.from_asset = swap_ends.from_asset)::bigint as from_amount_e8,
+        sum(legs.from_amount_usd) filter (where legs.from_asset = swap_ends.from_asset) as from_amount_usd,
         sum(legs.swap_volume_e8) filter (where legs.leg_type = 'user' and legs.from_asset = swap_ends.from_asset)::bigint as input_value_e8,
         sum(legs.to_amount_e8) filter (where legs.leg_type = 'user' and legs.to_asset = swap_ends.to_asset)::bigint as to_amount_e8,
         sum(legs.to_amount_usd) filter (where legs.leg_type = 'user' and legs.to_asset = swap_ends.to_asset) as to_amount_usd
@@ -94,7 +94,6 @@ combined as (
         transaction_legs.swap_volume_usd,
         swap_amounts.from_amount_e8,
         swap_amounts.from_amount_usd,
-        swap_amounts.user_volume_usd,
         swap_amounts.input_value_e8,
         swap_amounts.to_amount_e8,
         swap_amounts.to_amount_usd,
@@ -133,7 +132,7 @@ select
     {{ units('to_amount_e8') }} as to_amount,
     to_amount_e8,
     to_amount_usd,
-    user_volume_usd,
+    from_amount_usd as user_volume_usd,
     {{ units('swap_volume_e8') }} as swap_volume,
     swap_volume_e8,
     swap_volume_usd,
