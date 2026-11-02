@@ -2,7 +2,7 @@ version: 2
 
 models:
   - name: core__affiliate_fees
-    description: "One row per affiliate fee on a swap. Since affiliate fee events exist, one row per `affiliate_fee` event. Before that, one row per affiliate named in a user swap's memo with a fee rate above zero: the RUNE produced by the fee leg THORChain swapped in the user's transaction, or for swaps from RUNE the RUNE THORChain sent the affiliate. Where neither is found, an estimate of basis points × the swap's input value (`is_estimated`)."
+    description: "One row per affiliate fee on a swap. Since affiliate fee events exist, one row per `affiliate_fee` event. Before that, one row per affiliate named in a user swap's memo with a fee rate above zero: the RUNE produced by the fee leg THORChain swapped in the user's transaction, or for swaps from RUNE or synths the amount THORChain sent the affiliate. Where neither is found, an estimate of basis points × the swap's input value (`is_estimated`). Swaps from trade assets before affiliate fee events exist have no row: THORNode's payment failed and no fee was taken."
     data_tests:
       - unique_key:
           arguments:
@@ -37,13 +37,13 @@ models:
       - name: gross_amount_e8
         description: "`gross_amount` as a raw chain integer (1e-8 units)."
       - name: fee_amount
-        description: "Fee taken, real units of `asset`. Before affiliate fee events exist, what the fee leg sold, or for swaps from RUNE floor(basis points × deposit / 10000) as THORNode computes it (equal to the RUNE paid, except early versions that deducted the network fee from the payment); for estimated fees, basis points × `gross_amount`."
+        description: "Fee taken, real units of `asset`. Before affiliate fee events exist, what the fee leg sold, or for swaps from RUNE or synths floor(basis points × deposit / 10000) as THORNode computes it (equal to the amount paid, except early versions that deducted the network fee from the payment); for estimated fees, basis points × `gross_amount`."
       - name: fee_amount_e8
         description: "`fee_amount` as a raw chain integer (1e-8 units)."
         data_tests:
           - not_negative
       - name: affiliate_fee
-        description: "Fee in RUNE. Before affiliate fee events exist, the RUNE the fee leg produced, or for swaps from RUNE the RUNE paid to the affiliate; for estimated fees, basis points × the swap's input value in RUNE."
+        description: "Fee in RUNE. Before affiliate fee events exist, the RUNE the fee leg produced, or for swaps from RUNE or synths the amount paid to the affiliate (synths valued at the pool price in the block); for estimated fees, basis points × the swap's input value in RUNE."
       - name: affiliate_fee_e8
         description: "`affiliate_fee` as a raw chain integer (1e-8 units)."
         data_tests:
@@ -51,7 +51,7 @@ models:
       - name: affiliate_fee_usd
         description: "`affiliate_fee` in USD, priced at the block of the event."
       - name: is_estimated
-        description: "True when the fee is estimated from the swap memo: before affiliate fee events exist, for swaps where neither a fee leg nor a RUNE payment was found (for example swaps from synths or trade assets, whose fee was paid in that asset)."
+        description: "True when the fee is estimated from the swap memo: before affiliate fee events exist, for swaps where neither a fee leg nor a payment was found."
       - name: memo
         description: "{{ doc('memo') }}"
   - name: core__blocks
@@ -375,7 +375,7 @@ models:
       - name: from_asset
         description: "Asset the user swapped from."
       - name: from_amount
-        description: "Full amount the user sent to swap, before any affiliate fee, real units. Before affiliate fee events exist, the fee was taken from the input first: for inputs from other chains it was sold in its own leg, which is included; for RUNE deposited on THORChain it was paid by transfer, and the fee taken (`core.affiliate_fees.fee_amount`, estimated where no payment was found) is added. Can differ slightly from Midgard's swap input, which leaves the RUNE fee out."
+        description: "Full amount the user sent to swap, before any affiliate fee, real units. Before affiliate fee events exist, the fee was taken from the input first: for inputs from other chains it was sold in its own leg, which is included; for RUNE and synths deposited on THORChain it was paid by transfer, and the fee taken (`core.affiliate_fees.fee_amount`, estimated where no payment was found) is added. Trade-asset inputs had no fee taken, so their amount is what left the trade account. Can differ slightly from Midgard's swap input, which leaves the transferred fee out."
       - name: from_amount_e8
         description: "`from_amount` as a raw chain integer (1e-8 units)."
         data_tests:

@@ -90,6 +90,7 @@ memo_fees as (
         min(memo) as memo
     from memo_affiliates
     where affiliate_fee_bps > 0
+        and from_asset not like '%~%'
     group by tx_id, affiliate
 ),
 
@@ -97,12 +98,15 @@ memo_fees as (
 -- full input is the user legs plus the fee:
 -- - for inputs from other chains, the fee was swapped to RUNE in a leg of its own (one per transaction);
 --   the RUNE that leg produced is the fee paid.
--- - for RUNE deposited on THORChain, the fee was sent straight from the Asgard module to the affiliate
---   in the deposit's own transaction. The deposit is the user's transfer of the full input to Asgard
---   (in the swap's first block, or a few blocks earlier when the swap queue was full) whose amount less
---   floor(basis points × amount / 10000) is the swapped input; the payment is Asgard's transfer of at
---   most that fee in the same transaction (early versions also deducted the network fee from it). The
---   fee taken is the formula's amount; the fee paid is the transfer.
+-- - for RUNE and synths deposited on THORChain, the fee was sent straight from the Asgard module to the
+--   affiliate, in the input asset, in the deposit's own transaction. The deposit is the user's transfer
+--   of the full input to Asgard (in the swap's first block, or a few blocks earlier when the swap queue
+--   was full) whose amount less floor(basis points × amount / 10000) is the swapped input; the payment
+--   is Asgard's transfer of at most that fee in the same transaction (early versions also deducted the
+--   network fee from it). The fee taken is the formula's amount; the fee paid is the transfer.
+-- - for trade assets, THORNode tried the same bank transfer, which fails because trade assets are not
+--   bank coins, and the swap withdrew only the reduced amount from the trade account: no fee was taken
+--   or paid, so these swaps get no fee row.
 fee_legs as (
     select
         legs.tx_id,
@@ -119,9 +123,10 @@ fee_legs as (
     where legs.leg_type = 'affiliate_fee'
 ),
 
-rune_swaps as (
+native_swaps as (
     select distinct on (tx_id)
         tx_id,
+        from_asset,
         from_address,
         to_address,
         swap_block_height,
@@ -129,22 +134,23 @@ rune_swaps as (
         from_amount_e8,
         total_fee_bps
     from memo_fees
-    where from_asset = 'THOR.RUNE'
+    where from_asset = 'THOR.RUNE' or from_asset like '%/%'
     order by tx_id
 ),
 
-rune_deposits as (
+native_deposits as (
     select distinct on (swaps.tx_id)
         swaps.tx_id,
+        swaps.from_asset,
         deposits.event_id,
         deposits.block_height,
         deposits.amount_e8 as gross_amount_e8,
         floor(deposits.amount_e8 * swaps.total_fee_bps / 10000) as fee_due_e8
-    from rune_swaps as swaps
+    from native_swaps as swaps
     inner join {{ ref('events__transfers') }} as deposits
         on deposits.from_address = swaps.from_address
         and deposits.to_address = swaps.to_address
-        and deposits.asset = 'THOR.RUNE'
+        and deposits.asset = swaps.from_asset
         and deposits.block_height between swaps.swap_block_height - 10 and swaps.swap_block_height
     where case
         when swaps.is_streaming
@@ -154,7 +160,7 @@ rune_deposits as (
     order by swaps.tx_id, deposits.event_id desc
 ),
 
-rune_payments as (
+native_payments as (
     select distinct on (deposits.tx_id)
         deposits.tx_id,
         payments.event_id,
@@ -164,24 +170,48 @@ rune_payments as (
         deposits.fee_due_e8 as fee_amount_e8,
         payments.amount_e8 as affiliate_fee_e8,
         payments.amount * prices.rune_price_usd as affiliate_fee_usd
-    from rune_deposits as deposits
-    inner join rune_swaps as swaps
+    from native_deposits as deposits
+    inner join native_swaps as swaps
         on swaps.tx_id = deposits.tx_id
     inner join {{ ref('events__transfers') }} as payments
         on payments.block_height = deposits.block_height
         and payments.event_id / 10000 = deposits.event_id / 10000
         and payments.from_address = swaps.to_address
-        and payments.asset = 'THOR.RUNE'
+        and payments.asset = deposits.from_asset
         and payments.amount_e8 between 1 and deposits.fee_due_e8 + 1
     left join {{ ref('core__rune_price') }} as prices
         on prices.block_height = payments.block_height
     order by deposits.tx_id, payments.amount_e8 desc
 ),
 
+-- Synth payments are valued in RUNE at their pool's price in the block.
+native_payments_valued as (
+    select
+        tx_id,
+        event_id,
+        block_height,
+        block_time,
+        gross_amount_e8,
+        fee_amount_e8,
+        floor(affiliate_fee_e8 * rune_per_unit)::bigint as affiliate_fee_e8,
+        affiliate_fee_usd * rune_per_unit as affiliate_fee_usd
+    from (
+        select
+            payments.*,
+            case
+                when swaps.from_asset = 'THOR.RUNE' then 1
+                else {{ asset_price_at("replace(swaps.from_asset, '/', '.')", 'payments.block_height') }}
+            end as rune_per_unit
+        from native_payments as payments
+        inner join native_swaps as swaps
+            on swaps.tx_id = payments.tx_id
+    ) as priced
+),
+
 fees_paid as (
     select * from fee_legs
     union all
-    select * from rune_payments
+    select * from native_payments_valued
 ),
 
 -- A fee paid is shared among the memo's affiliates by basis points (in practice these memos name one

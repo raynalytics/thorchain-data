@@ -112,7 +112,7 @@ Swap volume in RUNE, every pool leg counted, affiliate fee and internal legs inc
 {% enddocs %}
 
 {% docs user_volume_usd %}
-Full value of the swap's input in USD, before any affiliate fee, at the block of each input leg; each user swap counted once. Before affiliate fee events exist, the fee was skimmed from the input first: swapped to RUNE in its own leg, whose input is included, or for RUNE deposited on THORChain paid by transfer, whose amount is added (estimated where no payment was found). Equals `core.swaps.from_amount_usd`. Matches the input Midgard reports for a swap, except for those RUNE deposits, where Midgard leaves the fee out.
+Full value of the swap's input in USD, before any affiliate fee, at the block of each input leg; each user swap counted once. Before affiliate fee events exist, the fee was skimmed from the input first: swapped to RUNE in its own leg, whose input is included, or for RUNE and synths deposited on THORChain paid by transfer, whose amount is added (estimated where no payment was found). Trade-asset inputs had no fee taken. Equals `core.swaps.from_amount_usd`. Matches the input Midgard reports for a swap, except for those RUNE and synth deposits, where Midgard leaves the fee out.
 {% enddocs %}
 
 {% docs liquidity_fee %}

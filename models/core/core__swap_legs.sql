@@ -69,7 +69,8 @@ event_fee_legs as (
 
 -- Before affiliate fee events exist, the fee is skimmed from the input: floor(bps × input / 10000) of
 -- the input asset is swapped to RUNE in a separate, non-streaming leg of the same transaction, and the
--- user's swap gets the rest. The memo carries a single affiliate and its basis points.
+-- user's swap gets the rest. The memo carries a single affiliate and its basis points. Inputs deposited
+-- on THORChain itself (RUNE, synths, trade assets) never had a fee leg.
 memo_fee_swaps as (
     select
         tx_id,
@@ -103,6 +104,8 @@ memo_fee_candidates as (
         and swaps.from_asset = legs.from_asset
     where not legs.is_internal
         and swaps.from_asset <> 'THOR.RUNE'
+        and swaps.from_asset not like '%/%'
+        and swaps.from_asset not like '%~%'
         and swaps.bps > 0
 ),
 
