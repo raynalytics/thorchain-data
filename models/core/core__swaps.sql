@@ -45,7 +45,7 @@ swap_ends as (
 
 -- Before affiliate fee events exist, the fee was skimmed from the input and sold in its own leg, so the
 -- full input is the user legs plus that leg. Later fee legs sell the output asset and are left out.
--- (RUNE deposited on THORChain paid its fee by transfer, not a leg; as in Midgard, it is not added.)
+-- (RUNE deposited on THORChain paid its fee by transfer, not a leg; see rune_input_fees.)
 swap_amounts as (
     select
         swap_ends.tx_id,
@@ -59,6 +59,24 @@ swap_amounts as (
         on legs.tx_id = swap_ends.tx_id
         and legs.leg_type in ('user', 'affiliate_fee')
     group by swap_ends.tx_id
+),
+
+-- Before affiliate fee events exist, a swap from RUNE deposited on THORChain paid its affiliate fee from
+-- the deposit by transfer rather than in a leg, so the fee taken is added back to give the full deposit.
+-- (Midgard's swap input leaves it out.)
+rune_input_fees as (
+    select
+        fees.tx_id,
+        sum(fees.fee_amount_e8)::bigint as fee_amount_e8,
+        sum({{ units('fees.fee_amount_e8') }} * prices.rune_price_usd) as fee_amount_usd
+    from {{ ref('core__affiliate_fees') }} as fees
+    inner join swap_ends
+        on swap_ends.tx_id = fees.tx_id
+        and swap_ends.from_asset = 'THOR.RUNE'
+    left join {{ ref('core__rune_price') }} as prices
+        on prices.block_height = fees.block_height
+    where fees.asset = 'THOR.RUNE'
+    group by fees.tx_id
 ),
 
 fee_affiliates as (
@@ -92,8 +110,8 @@ combined as (
         transaction_legs.liquidity_fee_usd,
         transaction_legs.swap_volume_e8,
         transaction_legs.swap_volume_usd,
-        swap_amounts.from_amount_e8,
-        swap_amounts.from_amount_usd,
+        swap_amounts.from_amount_e8 + coalesce(rune_input_fees.fee_amount_e8, 0) as from_amount_e8,
+        swap_amounts.from_amount_usd + coalesce(rune_input_fees.fee_amount_usd, 0) as from_amount_usd,
         swap_amounts.input_value_e8,
         swap_amounts.to_amount_e8,
         swap_amounts.to_amount_usd,
@@ -110,6 +128,8 @@ combined as (
         on transaction_legs.tx_id = swap_ends.tx_id
     inner join swap_amounts
         on swap_amounts.tx_id = swap_ends.tx_id
+    left join rune_input_fees
+        on rune_input_fees.tx_id = swap_ends.tx_id
     left join fee_affiliates
         on fee_affiliates.tx_id = swap_ends.tx_id
 )

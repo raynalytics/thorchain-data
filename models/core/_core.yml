@@ -37,7 +37,7 @@ models:
       - name: gross_amount_e8
         description: "`gross_amount` as a raw chain integer (1e-8 units)."
       - name: fee_amount
-        description: "Fee taken, real units of `asset`. Before affiliate fee events exist, what the fee leg sold, or for swaps from RUNE the RUNE paid; for estimated fees, basis points × `gross_amount`."
+        description: "Fee taken, real units of `asset`. Before affiliate fee events exist, what the fee leg sold, or for swaps from RUNE floor(basis points × deposit / 10000) as THORNode computes it (equal to the RUNE paid, except early versions that deducted the network fee from the payment); for estimated fees, basis points × `gross_amount`."
       - name: fee_amount_e8
         description: "`fee_amount` as a raw chain integer (1e-8 units)."
         data_tests:
@@ -375,7 +375,7 @@ models:
       - name: from_asset
         description: "Asset the user swapped from."
       - name: from_amount
-        description: "Full amount the user swapped in, before any affiliate fee, real units. Before affiliate fee events exist, the fee was taken from the input and sold in its own leg, which is included. Swaps from RUNE deposited on THORChain paid that fee by transfer instead; as in Midgard, it is not included (see `core.affiliate_fees.gross_amount`)."
+        description: "Full amount the user sent to swap, before any affiliate fee, real units. Before affiliate fee events exist, the fee was taken from the input first: for inputs from other chains it was sold in its own leg, which is included; for RUNE deposited on THORChain it was paid by transfer, and the fee taken (`core.affiliate_fees.fee_amount`, estimated where no payment was found) is added. Can differ slightly from Midgard's swap input, which leaves the RUNE fee out."
       - name: from_amount_e8
         description: "`from_amount` as a raw chain integer (1e-8 units)."
         data_tests:

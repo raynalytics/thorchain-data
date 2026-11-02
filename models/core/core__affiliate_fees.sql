@@ -101,7 +101,8 @@ memo_fees as (
 --   in the deposit's own transaction. The deposit is the user's transfer of the full input to Asgard
 --   (in the swap's first block, or a few blocks earlier when the swap queue was full) whose amount less
 --   floor(basis points × amount / 10000) is the swapped input; the payment is Asgard's transfer of at
---   most that fee in the same transaction (early versions also deducted the network fee from it).
+--   most that fee in the same transaction (early versions also deducted the network fee from it). The
+--   fee taken is the formula's amount; the fee paid is the transfer.
 fee_legs as (
     select
         legs.tx_id,
@@ -160,7 +161,7 @@ rune_payments as (
         payments.block_height,
         payments.block_time,
         deposits.gross_amount_e8,
-        payments.amount_e8 as fee_amount_e8,
+        deposits.fee_due_e8 as fee_amount_e8,
         payments.amount_e8 as affiliate_fee_e8,
         payments.amount * prices.rune_price_usd as affiliate_fee_usd
     from rune_deposits as deposits
