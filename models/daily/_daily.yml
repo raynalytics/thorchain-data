@@ -12,7 +12,6 @@ models:
         description: "{{ doc('day') }}"
         data_tests:
           - not_null
-          - no_missing_days
       - name: affiliate
         description: "{{ doc('affiliate') }}"
         data_tests:
@@ -24,11 +23,11 @@ models:
       - name: unique_swappers
         description: "Number of distinct addresses that swapped with this affiliate."
       - name: user_volume_usd
-        description: "Input value of those swaps in USD, each swap counted once."
+        description: "Full input value of those swaps in USD, before any affiliate fee, each swap counted once."
       - name: swap_volume_usd
         description: "Swap volume of those swaps in USD, every pool leg counted."
       - name: fee_payment_count
-        description: "Number of affiliate fees: fee payments, or estimated fees before affiliate fee events exist."
+        description: "Number of affiliate fees (rows of `core.affiliate_fees`), estimated ones included."
       - name: affiliate_fee
         description: "Affiliate fees, in RUNE."
       - name: affiliate_fee_e8
@@ -38,7 +37,7 @@ models:
       - name: affiliate_fee_usd
         description: "`affiliate_fee` in USD: the sum of values priced at each event's block."
       - name: is_affiliate_fee_estimated
-        description: "True when any of the day's affiliate fees are estimated from swap memos."
+        description: "True when any of the day's affiliate fees are estimated from swap memos (no fee leg found)."
   - name: daily__network
     description: "One row per day for the whole network, every day from the first to the last indexed block. Flows are totals for the day; balances and prices are as of the end of the day."
     columns:

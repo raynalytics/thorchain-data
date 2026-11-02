@@ -51,6 +51,22 @@ swap_inputs as (
     group by legs.tx_id, firsts.from_asset, firsts.memo
 ),
 
+-- Before affiliate fee events exist, THORChain skimmed the fee from the input and swapped it to RUNE
+-- in a leg of its own (one per transaction); the RUNE it produced is the fee paid.
+fee_legs as (
+    select
+        tx_id,
+        event_id,
+        block_height,
+        block_time,
+        from_amount_e8,
+        to_amount_e8,
+        to_amount_usd
+    from {{ ref('core__swap_legs') }}
+    where leg_type = 'affiliate_fee'
+        and tx_id in (select tx_id from swap_inputs)
+),
+
 -- The memo lists affiliates and their basis points, separated by '/'.
 memo_affiliates as (
     select
@@ -66,34 +82,66 @@ memo_affiliates as (
     where named.affiliate <> ''
 ),
 
-estimated as (
+memo_fees as (
     select
-        event_id,
-        block_height,
-        block_time,
-        (block_time at time zone 'UTC')::date as day,
         tx_id,
         affiliate,
-        case when affiliate not like 'thor1%' then affiliate end as thorname,
-        case when affiliate like 'thor1%' then affiliate end as affiliate_address,
-        sum(affiliate_fee_bps)::bigint as affiliate_fee_bps,
-        from_asset as asset,
-        from_amount_e8::bigint as gross_amount_e8,
-        floor(sum(affiliate_fee_bps) * from_amount_e8 / 10000)::bigint as fee_amount_e8,
-        floor(sum(affiliate_fee_bps) * input_value_e8 / 10000)::bigint as affiliate_fee_e8,
-        sum(affiliate_fee_bps) * input_value_usd / 10000 as affiliate_fee_usd,
-        memo,
-        true as is_estimated
+        sum(affiliate_fee_bps) as affiliate_fee_bps,
+        sum(sum(affiliate_fee_bps)) over (partition by tx_id) as total_fee_bps,
+        min(event_id) as swap_event_id,
+        min(block_height) as swap_block_height,
+        min(block_time) as swap_block_time,
+        min(from_asset) as from_asset,
+        min(from_amount_e8) as from_amount_e8,
+        min(input_value_e8) as input_value_e8,
+        min(input_value_usd) as input_value_usd,
+        min(memo) as memo
     from memo_affiliates
     where affiliate_fee_bps > 0
-    group by event_id, block_height, block_time, tx_id, affiliate, from_asset, from_amount_e8,
-        input_value_e8, input_value_usd, memo
+    group by tx_id, affiliate
+),
+
+-- Where a fee leg exists, its fee is shared among the memo's affiliates by basis points (in practice
+-- these memos name one affiliate). Otherwise the fee is estimated as basis points × the input.
+memo_era as (
+    select
+        coalesce(fee_legs.event_id, memo_fees.swap_event_id) as event_id,
+        coalesce(fee_legs.block_height, memo_fees.swap_block_height) as block_height,
+        coalesce(fee_legs.block_time, memo_fees.swap_block_time) as block_time,
+        (coalesce(fee_legs.block_time, memo_fees.swap_block_time) at time zone 'UTC')::date as day,
+        memo_fees.tx_id,
+        memo_fees.affiliate,
+        case when memo_fees.affiliate not like 'thor1%' then memo_fees.affiliate end as thorname,
+        case when memo_fees.affiliate like 'thor1%' then memo_fees.affiliate end as affiliate_address,
+        memo_fees.affiliate_fee_bps::bigint as affiliate_fee_bps,
+        memo_fees.from_asset as asset,
+        (memo_fees.from_amount_e8 + coalesce(fee_legs.from_amount_e8, 0))::bigint as gross_amount_e8,
+        case
+            when fee_legs.event_id is not null
+                then floor(fee_legs.from_amount_e8 * memo_fees.affiliate_fee_bps / memo_fees.total_fee_bps)
+            else floor(memo_fees.affiliate_fee_bps * memo_fees.from_amount_e8 / 10000)
+        end::bigint as fee_amount_e8,
+        case
+            when fee_legs.event_id is not null
+                then floor(fee_legs.to_amount_e8 * memo_fees.affiliate_fee_bps / memo_fees.total_fee_bps)
+            else floor(memo_fees.affiliate_fee_bps * memo_fees.input_value_e8 / 10000)
+        end::bigint as affiliate_fee_e8,
+        case
+            when fee_legs.event_id is not null
+                then fee_legs.to_amount_usd * memo_fees.affiliate_fee_bps / memo_fees.total_fee_bps
+            else memo_fees.affiliate_fee_bps * memo_fees.input_value_usd / 10000
+        end as affiliate_fee_usd,
+        memo_fees.memo,
+        fee_legs.event_id is null as is_estimated
+    from memo_fees
+    left join fee_legs
+        on fee_legs.tx_id = memo_fees.tx_id
 ),
 
 fees as (
     select * from recorded
     union all
-    select * from estimated
+    select * from memo_era
 )
 
 select
