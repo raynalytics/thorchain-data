@@ -1,5 +1,21 @@
+-- A user swap is the user legs of one transaction. Affiliate fee legs in the same transaction count
+-- towards its swap volume, liquidity fee and leg count only; internal legs belong to no user swap.
 with legs as (
     select * from {{ ref('core__swap_legs') }}
+    where leg_type = 'user'
+),
+
+transaction_legs as (
+    select
+        tx_id,
+        count(*) as leg_count,
+        sum(liquidity_fee_e8)::bigint as liquidity_fee_e8,
+        sum(liquidity_fee_usd) as liquidity_fee_usd,
+        sum(swap_volume_e8)::bigint as swap_volume_e8,
+        sum(swap_volume_usd) as swap_volume_usd
+    from {{ ref('core__swap_legs') }}
+    where leg_type in ('user', 'affiliate_fee')
+    group by tx_id
 ),
 
 swap_ends as (
@@ -20,13 +36,9 @@ swap_ends as (
         ) as to_asset,
         (array_agg(memo order by event_id))[1] as memo,
         (array_agg(tx_type order by event_id))[1] as tx_type,
-        count(*) as leg_count,
         bool_or(is_streaming) as is_streaming,
         max(streaming_quantity) as streaming_quantity,
-        sum(liquidity_fee_e8)::bigint as liquidity_fee_e8,
-        sum(liquidity_fee_usd) as liquidity_fee_usd,
-        sum(swap_volume_e8)::bigint as swap_volume_e8,
-        sum(swap_volume_usd) as swap_volume_usd
+        sum(liquidity_fee_e8)::bigint as user_liquidity_fee_e8
     from legs
     group by tx_id
 ),
@@ -51,7 +63,8 @@ fee_affiliates as (
         array_agg(affiliate order by first_event_id) as affiliates,
         sum(affiliate_fee_bps)::bigint as affiliate_fee_bps,
         sum(affiliate_fee_e8)::bigint as affiliate_fee_e8,
-        sum(affiliate_fee_usd) as affiliate_fee_usd
+        sum(affiliate_fee_usd) as affiliate_fee_usd,
+        bool_or(is_estimated) as is_affiliate_fee_estimated
     from (
         select
             tx_id,
@@ -59,7 +72,8 @@ fee_affiliates as (
             min(event_id) as first_event_id,
             max(affiliate_fee_bps) as affiliate_fee_bps,
             sum(affiliate_fee_e8)::bigint as affiliate_fee_e8,
-            sum(affiliate_fee_usd) as affiliate_fee_usd
+            sum(affiliate_fee_usd) as affiliate_fee_usd,
+            bool_or(is_estimated) as is_estimated
         from {{ ref('core__affiliate_fees') }}
         group by tx_id, affiliate
     ) as per_affiliate
@@ -69,6 +83,11 @@ fee_affiliates as (
 combined as (
     select
         swap_ends.*,
+        transaction_legs.leg_count,
+        transaction_legs.liquidity_fee_e8,
+        transaction_legs.liquidity_fee_usd,
+        transaction_legs.swap_volume_e8,
+        transaction_legs.swap_volume_usd,
         swap_amounts.from_amount_e8,
         swap_amounts.from_amount_usd,
         swap_amounts.input_value_e8,
@@ -80,8 +99,11 @@ combined as (
         ) as affiliates,
         fee_affiliates.affiliate_fee_bps,
         fee_affiliates.affiliate_fee_e8,
-        fee_affiliates.affiliate_fee_usd
+        fee_affiliates.affiliate_fee_usd,
+        fee_affiliates.is_affiliate_fee_estimated
     from swap_ends
+    inner join transaction_legs
+        on transaction_legs.tx_id = swap_ends.tx_id
     inner join swap_amounts
         on swap_amounts.tx_id = swap_ends.tx_id
     left join fee_affiliates
@@ -113,13 +135,14 @@ select
     {{ units('liquidity_fee_e8') }} as liquidity_fee,
     liquidity_fee_e8,
     liquidity_fee_usd,
-    round(liquidity_fee_e8 * 10000.0 / nullif(input_value_e8, 0), 2) as liquidity_fee_bps,
+    round(user_liquidity_fee_e8 * 10000.0 / nullif(input_value_e8, 0), 2) as liquidity_fee_bps,
     affiliates[1] as affiliate,
     affiliates,
     affiliate_fee_bps,
     {{ units('affiliate_fee_e8') }} as affiliate_fee,
     affiliate_fee_e8,
     affiliate_fee_usd,
+    is_affiliate_fee_estimated,
     leg_count,
     is_streaming,
     streaming_quantity,

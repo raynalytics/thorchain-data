@@ -1054,7 +1054,7 @@ models:
       - name: failed_swap_reasons
         description: "Reasons the listed sub-swaps failed, in the same order."
   - name: events__swaps
-    description: "One row per `swap` event: a single pool leg of a swap. A swap routed through RUNE has two legs; a streaming swap has one or two legs per sub-swap. `tx_id` links legs of the same swap."
+    description: "One row per `swap` event: a single pool leg of a swap. A swap routed through RUNE has two legs; a streaming swap has one or two legs per sub-swap. `tx_id` links the legs of one transaction; `core.swap_legs.leg_type` tells a user's legs apart from affiliate fee and internal legs."
     columns:
       - name: event_id
         description: "{{ doc('event_id') }}"

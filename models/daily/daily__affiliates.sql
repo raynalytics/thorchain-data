@@ -29,7 +29,8 @@ fee_stats as (
         affiliate,
         count(*) as fee_payment_count,
         sum(affiliate_fee_e8)::bigint as affiliate_fee_e8,
-        sum(affiliate_fee_usd) as affiliate_fee_usd
+        sum(affiliate_fee_usd) as affiliate_fee_usd,
+        bool_or(is_estimated) as is_affiliate_fee_estimated
     from {{ ref('core__affiliate_fees') }}
     group by day, affiliate
 )
@@ -44,7 +45,8 @@ select
     coalesce(fee_stats.fee_payment_count, 0) as fee_payment_count,
     {{ units('coalesce(fee_stats.affiliate_fee_e8, 0)') }} as affiliate_fee,
     coalesce(fee_stats.affiliate_fee_e8, 0) as affiliate_fee_e8,
-    coalesce(fee_stats.affiliate_fee_usd, 0) as affiliate_fee_usd
+    coalesce(fee_stats.affiliate_fee_usd, 0) as affiliate_fee_usd,
+    coalesce(fee_stats.is_affiliate_fee_estimated, false) as is_affiliate_fee_estimated
 from swap_stats
 full outer join fee_stats
     on fee_stats.day = swap_stats.day

@@ -35,7 +35,7 @@ swap_legs as (
     select
         day,
         pool,
-        count(distinct from_address) as unique_swappers,
+        count(distinct from_address) filter (where leg_type = 'user') as unique_swappers,
         sum(swap_volume_e8)::bigint as swap_volume_e8,
         sum(swap_volume_usd) as swap_volume_usd,
         sum(liquidity_fee_e8)::bigint as liquidity_fee_e8,
@@ -52,6 +52,7 @@ swap_counts as (
     from {{ ref('core__swap_legs') }} as legs
     inner join {{ ref('core__swaps') }} as swaps
         on swaps.tx_id = legs.tx_id
+    where legs.leg_type = 'user'
     group by swaps.day, legs.pool
 ),
 

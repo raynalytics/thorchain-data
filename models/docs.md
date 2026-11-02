@@ -15,7 +15,8 @@ Conventions used in every table:
 - `block_time` is a UTC timestamp and `day` a UTC date.
 - Amounts appear twice: `<name>` in real units (1.5 = 1.5 RUNE or 1.5 of the asset) and `<name>_e8` as the raw chain integer (150000000).
 - `<name>_usd` values are priced at the block the event happened in: RUNE from Midgard's per-block RUNE price, other assets from their pool's depths at that block times the RUNE price.
-- Swap volume comes in two measures: `swap_volume_usd` counts every pool leg (a swap routed through RUNE counts twice); `user_volume_usd` counts each user swap once at its input value.
+- Swap volume comes in two measures: `swap_volume_usd` counts every pool leg (a swap routed through RUNE counts twice), including legs that convert affiliate fees and internal swaps made by the protocol; `user_volume_usd` counts each user swap once at its input value.
+- Swap legs are of three types (`core.swap_legs.leg_type`): `user` legs make up the user's swap; `affiliate_fee` legs swap an affiliate fee to RUNE inside the user's transaction; `internal` legs are swaps the protocol makes on its own account.
 {% enddocs %}
 
 {% docs event_id %}
@@ -103,7 +104,7 @@ Price of 1 unit of the pool's asset in USD: `asset_price` × RUNE price.
 {% enddocs %}
 
 {% docs swap_volume %}
-Swap volume in RUNE, every pool leg counted: the RUNE side of each leg (for legs paying out RUNE, the RUNE paid out plus the liquidity fee). Same measure as Midgard's swap volume.
+Swap volume in RUNE, every pool leg counted, affiliate fee and internal legs included: the RUNE side of each leg (for legs paying out RUNE, the RUNE paid out plus the liquidity fee). Same measure as Midgard's swap volume.
 {% enddocs %}
 
 {% docs swap_volume_usd %}
@@ -111,7 +112,7 @@ Swap volume in RUNE, every pool leg counted: the RUNE side of each leg (for legs
 {% enddocs %}
 
 {% docs user_volume_usd %}
-Value of the swap's input in USD at the block it started, each user swap counted once.
+Value of the swap's input in USD at the block it started, each user swap counted once. Affiliate fees swapped to RUNE in the same transaction are not part of it.
 {% enddocs %}
 
 {% docs liquidity_fee %}
