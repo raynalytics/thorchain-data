@@ -1,3 +1,10 @@
+{{ config(
+    materialized='incremental',
+    unique_key='event_id',
+    incremental_strategy='delete+insert',
+    indexes=[{'columns': ['event_id'], 'unique': true}, {'columns': ['block_height']}]
+) }}
+
 select
     event_id,
     {{ block_height('event_id') }} as block_height,
@@ -12,3 +19,6 @@ select
         else 0
     end as active_node_change
 from {{ source('midgard', 'update_node_account_status_events') }}
+{%- if is_incremental() %}
+where block_timestamp > {{ block_timestamp_ns(high_water_block()) }}
+{%- endif %}

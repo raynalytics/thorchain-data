@@ -1,4 +1,9 @@
-{{ config(indexes=[{'columns': ['pool', 'block_height'], 'unique': true}]) }}
+{{ config(
+    materialized='incremental',
+    unique_key=['pool', 'block_height'],
+    incremental_strategy='delete+insert',
+    indexes=[{'columns': ['pool', 'block_height'], 'unique': true}, {'columns': ['block_height']}]
+) }}
 
 select
     blocks.height as block_height,
@@ -18,3 +23,6 @@ inner join {{ source('midgard', 'block_log') }} as blocks
     on blocks.timestamp = depths.block_timestamp
 left join {{ ref('core__rune_price') }} as prices
     on prices.block_height = blocks.height
+{%- if is_incremental() %}
+where depths.block_timestamp > {{ block_timestamp_ns(high_water_block()) }}
+{%- endif %}

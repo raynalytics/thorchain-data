@@ -1,4 +1,49 @@
-with recorded as (
+{{ config(
+    materialized='incremental',
+    unique_key='tx_id',
+    incremental_strategy='delete+insert',
+    indexes=[{'columns': ['tx_id']}, {'columns': ['block_height']}, {'columns': ['day']}]
+) }}
+
+{%- if is_incremental() %}
+{%- set last_block = high_water_block() %}
+{%- endif %}
+
+-- An incremental run rebuilds the fees of every transaction with swap legs or affiliate fee events
+-- since the last block in the table.
+with
+{%- if is_incremental() %}
+touched_transactions as (
+    select tx_id from {{ ref('core__swap_legs') }}
+    where block_height > {{ last_block }} and leg_type <> 'internal'
+    union
+    select tx_id from {{ source('midgard', 'affiliate_fee_events') }}
+    where block_timestamp > {{ block_timestamp_ns(last_block) }}
+),
+
+swap_legs as (
+    select * from {{ ref('core__swap_legs') }}
+    where tx_id in (select tx_id from touched_transactions)
+),
+{%- else %}
+swap_legs as (
+    select * from {{ ref('core__swap_legs') }}
+),
+{%- endif %}
+
+first_fee_event as (
+    select coalesce(
+        (
+            select event_id
+            from {{ source('midgard', 'affiliate_fee_events') }}
+            order by block_timestamp, event_id
+            limit 1
+        ),
+        9223372036854775807
+    ) as event_id
+),
+
+recorded as (
     select
         fees.event_id,
         {{ block_height('fees.event_id') }} as block_height,
@@ -19,6 +64,9 @@ with recorded as (
     from {{ source('midgard', 'affiliate_fee_events') }} as fees
     left join {{ ref('core__rune_price') }} as prices
         on prices.block_height = {{ block_height('fees.event_id') }}
+    {%- if is_incremental() %}
+    where fees.tx_id in (select tx_id from touched_transactions)
+    {%- endif %}
 ),
 
 -- User swaps that started before affiliate fee events exist, with their input amount and value.
@@ -36,7 +84,7 @@ swap_inputs as (
         sum(legs.from_amount_e8) filter (where legs.from_asset = firsts.from_asset) as from_amount_e8,
         sum(legs.swap_volume_e8) filter (where legs.from_asset = firsts.from_asset) as input_value_e8,
         sum(legs.from_amount_usd) filter (where legs.from_asset = firsts.from_asset) as input_value_usd
-    from {{ ref('core__swap_legs') }} as legs
+    from swap_legs as legs
     inner join (
         select distinct on (tx_id)
             tx_id,
@@ -45,13 +93,13 @@ swap_inputs as (
             from_address,
             to_address,
             memo
-        from {{ ref('core__swap_legs') }}
+        from swap_legs
         where leg_type = 'user'
         order by tx_id, event_id
     ) as firsts
         on firsts.tx_id = legs.tx_id
     where legs.leg_type = 'user'
-        and firsts.event_id < coalesce((select min(event_id) from recorded), 9223372036854775807)
+        and firsts.event_id < (select event_id from first_fee_event)
         and not exists (select 1 from recorded where recorded.tx_id = legs.tx_id)
     group by legs.tx_id, firsts.from_asset, firsts.from_address, firsts.to_address, firsts.memo
 ),
@@ -117,7 +165,7 @@ fee_legs as (
         legs.from_amount_e8 as fee_amount_e8,
         legs.to_amount_e8 as affiliate_fee_e8,
         legs.to_amount_usd as affiliate_fee_usd
-    from {{ ref('core__swap_legs') }} as legs
+    from swap_legs as legs
     inner join swap_inputs as swaps
         on swaps.tx_id = legs.tx_id
     where legs.leg_type = 'affiliate_fee'
@@ -138,6 +186,18 @@ native_swaps as (
     order by tx_id
 ),
 
+-- Transfers in the blocks where those deposits can be: from 10 blocks before the first such swap to
+-- the last one.
+transfers as (
+    {{ events__transfers_sql(midgard_rows(
+        'transfer_events',
+        'block_timestamp between (select coalesce(min(timestamp), 0) from ' ~ source('midgard', 'block_log')
+            ~ ' where height >= (select min(swap_block_height) - 10 from native_swaps))'
+            ~ ' and (select coalesce(max(timestamp), -1) from ' ~ source('midgard', 'block_log')
+            ~ ' where height <= (select max(swap_block_height) from native_swaps))'
+    )) }}
+),
+
 native_deposits as (
     select distinct on (swaps.tx_id)
         swaps.tx_id,
@@ -147,7 +207,7 @@ native_deposits as (
         deposits.amount_e8 as gross_amount_e8,
         floor(deposits.amount_e8 * swaps.total_fee_bps / 10000) as fee_due_e8
     from native_swaps as swaps
-    inner join {{ ref('events__transfers') }} as deposits
+    inner join transfers as deposits
         on deposits.from_address = swaps.from_address
         and deposits.to_address = swaps.to_address
         and deposits.asset = swaps.from_asset
@@ -173,7 +233,7 @@ native_payments as (
     from native_deposits as deposits
     inner join native_swaps as swaps
         on swaps.tx_id = deposits.tx_id
-    inner join {{ ref('events__transfers') }} as payments
+    inner join transfers as payments
         on payments.block_height = deposits.block_height
         and payments.event_id / 10000 = deposits.event_id / 10000
         and payments.from_address = swaps.to_address
@@ -185,6 +245,17 @@ native_payments as (
 ),
 
 -- Synth payments are valued in RUNE at their pool's price in the block.
+native_payment_pools as (
+    select
+        payments.*,
+        case when swaps.from_asset like '%/%' then replace(swaps.from_asset, '/', '.') end as pool
+    from native_payments as payments
+    inner join native_swaps as swaps
+        on swaps.tx_id = payments.tx_id
+),
+
+native_payment_prices as {{ asset_prices_as_of('native_payment_pools') }},
+
 native_payments_valued as (
     select
         tx_id,
@@ -198,13 +269,11 @@ native_payments_valued as (
     from (
         select
             payments.*,
-            case
-                when swaps.from_asset = 'THOR.RUNE' then 1
-                else {{ asset_price_at("replace(swaps.from_asset, '/', '.')", 'payments.block_height') }}
-            end as rune_per_unit
-        from native_payments as payments
-        inner join native_swaps as swaps
-            on swaps.tx_id = payments.tx_id
+            case when payments.pool is null then 1 else prices.asset_price end as rune_per_unit
+        from native_payment_pools as payments
+        left join native_payment_prices as prices
+            on prices.pool = payments.pool
+            and prices.block_height = payments.block_height
     ) as priced
 ),
 

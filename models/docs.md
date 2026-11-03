@@ -17,6 +17,7 @@ Conventions used in every table:
 - `<name>_usd` values are priced at the block the event happened in: RUNE from Midgard's per-block RUNE price, other assets from their pool's depths at that block times the RUNE price.
 - Swap volume comes in two measures: `swap_volume_usd` counts every pool leg (a swap routed through RUNE counts twice), including legs that convert affiliate fees and internal swaps made by the protocol; `user_volume_usd` counts each user swap once at the full value the user sent, before any affiliate fee.
 - Swap legs are of three types (`core.swap_legs.leg_type`): `user` legs make up the user's swap; `affiliate_fee` legs swap an affiliate fee to RUNE inside the user's transaction; `internal` legs are swaps the protocol makes on its own account.
+- `core` and `daily` tables update incrementally: each refresh adds the new blocks, and a streaming swap still in progress (`core.swaps.status`) is updated, with the days it touches, until it finishes.
 {% enddocs %}
 
 {% docs event_id %}

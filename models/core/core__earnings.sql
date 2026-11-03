@@ -1,18 +1,41 @@
+{{ config(
+    materialized='incremental',
+    unique_key='block_height',
+    incremental_strategy='delete+insert',
+    indexes=[{'columns': ['block_height'], 'unique': true}, {'columns': ['day']}]
+) }}
+
+{%- if is_incremental() %}
+{%- set last_block = high_water_block() %}
+{%- set since_ns = block_timestamp_ns(last_block) %}
+{%- endif %}
+
 -- Same definitions as Midgard's earnings history: liquidity fees from swaps, block rewards split
 -- between pools and bonded nodes, and earnings as their sum.
 with per_block as (
     select block_height, liquidity_fee_e8 as liquidity_fee_e8, 0::bigint as pool_rewards_e8, 0::bigint as bond_rewards_e8
     from {{ ref('core__swap_legs') }}
+    {%- if is_incremental() %}
+    where block_height > {{ last_block }}
+    {%- endif %}
 
     union all
 
     select block_height, 0, pool_rewards_e8, 0
+    {%- if is_incremental() %}
+    from ({{ events__pool_rewards_sql(midgard_rows('rewards_event_entries', 'block_timestamp > ' ~ since_ns)) }}) as pool_rewards
+    {%- else %}
     from {{ ref('events__pool_rewards') }}
+    {%- endif %}
 
     union all
 
     select block_height, 0, 0, bond_rewards_e8
+    {%- if is_incremental() %}
+    from ({{ events__rewards_sql(midgard_rows('rewards_events', 'block_timestamp > ' ~ since_ns)) }}) as rewards
+    {%- else %}
     from {{ ref('events__rewards') }}
+    {%- endif %}
 ),
 
 totals as (

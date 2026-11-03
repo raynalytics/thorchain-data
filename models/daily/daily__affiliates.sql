@@ -1,3 +1,16 @@
+{{ config(
+    materialized='incremental',
+    unique_key='day',
+    incremental_strategy='delete+insert',
+    indexes=[{'columns': ['day', 'affiliate'], 'unique': true}]
+) }}
+
+-- depends_on: {{ ref('core__blocks') }}
+{%- if is_incremental() %}
+{%- set start_day = daily_start_day() %}
+{%- endif %}
+
+-- An incremental run recomputes the days from daily_start_day() on.
 with swap_affiliates as (
     select distinct
         swaps.day,
@@ -9,6 +22,9 @@ with swap_affiliates as (
     from {{ ref('core__swaps') }} as swaps
     cross join lateral unnest(swaps.affiliates) as named (affiliate)
     where named.affiliate is not null
+    {%- if is_incremental() %}
+        and swaps.day >= date '{{ start_day }}'
+    {%- endif %}
 ),
 
 swap_stats as (
@@ -32,6 +48,9 @@ fee_stats as (
         sum(affiliate_fee_usd) as affiliate_fee_usd,
         bool_or(is_estimated) as is_affiliate_fee_estimated
     from {{ ref('core__affiliate_fees') }}
+    {%- if is_incremental() %}
+    where day >= date '{{ start_day }}'
+    {%- endif %}
     group by day, affiliate
 )
 

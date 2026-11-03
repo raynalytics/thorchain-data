@@ -1,5 +1,23 @@
+{{ config(
+    materialized='incremental',
+    unique_key='day',
+    incremental_strategy='delete+insert',
+    indexes=[{'columns': ['day'], 'unique': true}]
+) }}
+
+{%- if is_incremental() %}
+{%- set start_day = daily_start_day() %}
+{%- set since_block = first_block_of("date '" ~ start_day ~ "'") %}
+{%- endif %}
+
+-- An incremental run recomputes the days from daily_start_day() on; bonded RUNE and active nodes
+-- continue from the stored day before.
 with rune_prices as (
+    {%- if is_incremental() %}
+    {{ end_of_day_rune_price(start_day) }}
+    {%- else %}
     {{ end_of_day_rune_price() }}
+    {%- endif %}
 ),
 
 swaps as (
@@ -9,6 +27,9 @@ swaps as (
         count(distinct from_address) as unique_swappers,
         sum(user_volume_usd) as user_volume_usd
     from {{ ref('core__swaps') }}
+    {%- if is_incremental() %}
+    where day >= date '{{ start_day }}'
+    {%- endif %}
     group by day
 ),
 
@@ -18,6 +39,9 @@ swap_legs as (
         sum(swap_volume_e8)::bigint as swap_volume_e8,
         sum(swap_volume_usd) as swap_volume_usd
     from {{ ref('core__swap_legs') }}
+    {%- if is_incremental() %}
+    where block_height >= {{ since_block }}
+    {%- endif %}
     group by day
 ),
 
@@ -37,6 +61,9 @@ earnings as (
         sum(earnings_e8)::bigint as earnings_e8,
         sum(earnings_usd) as earnings_usd
     from {{ ref('core__earnings') }}
+    {%- if is_incremental() %}
+    where block_height >= {{ since_block }}
+    {%- endif %}
     group by day
 ),
 
@@ -45,6 +72,9 @@ pooled as (
         day,
         sum(total_value_pooled_e8)::bigint as total_value_pooled_e8
     from {{ ref('daily__pools') }}
+    {%- if is_incremental() %}
+    where day >= date '{{ start_day }}'
+    {%- endif %}
     group by day
 ),
 
@@ -52,7 +82,13 @@ bond_changes as (
     select
         (block_time at time zone 'UTC')::date as day,
         sum(bond_change_e8) as bond_change_e8
+    {%- if is_incremental() %}
+    from ({{ events__bonds_sql(midgard_rows(
+        'bond_events', 'block_timestamp >= ' ~ day_start_ns("date '" ~ start_day ~ "'")
+    )) }}) as bonds
+    {%- else %}
     from {{ ref('events__bonds') }}
+    {%- endif %}
     group by 1
 ),
 
@@ -61,6 +97,9 @@ node_changes as (
         day,
         sum(active_node_change) as active_node_change
     from {{ ref('core__node_status_changes') }}
+    {%- if is_incremental() %}
+    where block_height >= {{ since_block }}
+    {%- endif %}
     group by day
 ),
 
@@ -70,9 +109,25 @@ running as (
         rune_prices.day,
         rune_prices.rune_price_usd,
         coalesce(pooled.total_value_pooled_e8, 0) as total_value_pooled_e8,
+        {%- if is_incremental() %}
+        previous.total_value_bonded_e8
+            + sum(coalesce(bond_changes.bond_change_e8, 0)) over (order by rune_prices.day)::bigint as total_value_bonded_e8,
+        previous.active_nodes
+            + sum(coalesce(node_changes.active_node_change, 0)) over (order by rune_prices.day)::bigint as active_nodes
+        {%- else %}
         sum(coalesce(bond_changes.bond_change_e8, 0)) over (order by rune_prices.day)::bigint as total_value_bonded_e8,
         sum(coalesce(node_changes.active_node_change, 0)) over (order by rune_prices.day)::bigint as active_nodes
+        {%- endif %}
     from rune_prices
+    {%- if is_incremental() %}
+    cross join (
+        select
+            coalesce(max(total_value_bonded_e8), 0) as total_value_bonded_e8,
+            coalesce(max(active_nodes), 0) as active_nodes
+        from {{ this }}
+        where day = date '{{ start_day }}' - 1
+    ) as previous
+    {%- endif %}
     left join pooled
         on pooled.day = rune_prices.day
     left join bond_changes

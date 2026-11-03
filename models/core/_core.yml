@@ -349,7 +349,7 @@ models:
       - name: memo
         description: "{{ doc('memo') }}"
   - name: core__swaps
-    description: "One row per user swap, however many pool legs or streaming sub-swaps it took: the `user` legs of one inbound transaction. Affiliate fee legs in the same transaction count towards the swap's volume, liquidity fee and leg count but not its amounts; internal legs are not part of any swap."
+    description: "One row per user swap, however many pool legs or streaming sub-swaps it took: the `user` legs of one inbound transaction. Affiliate fee legs in the same transaction count towards the swap's volume, liquidity fee and leg count but not its amounts; internal legs are not part of any swap. A streaming swap still in progress shows its sub-swaps so far and is updated as it continues."
     columns:
       - name: tx_id
         description: "{{ doc('tx_id') }}"
@@ -434,6 +434,17 @@ models:
         description: "True for streaming swaps."
       - name: streaming_quantity
         description: "For streaming swaps, the number of sub-swaps planned."
+      - name: streaming_count
+        description: "Number of sub-swaps carried out so far, failed ones included (1 for a swap that is not streaming). From THORNode's result once a streaming swap has finished, otherwise from its latest leg."
+        data_tests:
+          - not_negative
+      - name: status
+        description: "`completed`: every sub-swap was carried out and the whole input swapped (always, for a swap that is not streaming). `partly_refunded`: a streaming swap that finished with part of the input not swapped (failed sub-swaps), which was refunded. `in_progress`: a streaming swap with no result from THORNode yet. Taken from THORNode's `streaming_swap` result; streaming swaps from before THORNode reported results (v1.117) count as completed when their last leg was the last planned sub-swap, otherwise as partly refunded."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['in_progress', 'completed', 'partly_refunded']
       - name: tx_type
         description: "{{ doc('tx_type') }}"
       - name: memo
