@@ -100,3 +100,8 @@ insert into midgard.update_node_account_status_events select n, 'Ready', 'Active
 insert into midgard.update_node_account_status_events select 'thor1n2', 'Active', 'Standby', 102 * 10000000000 + 9000000000 + 5, ts from t where h = 102;
 insert into midgard.bond_events (tx, asset_e8, bond_type, e8, node_addr, event_id, block_timestamp)
 select 'BOND1', 0, 'bond_paid', 300000000000000, 'thor1n1', 96 * 10000000000 + 1000000000 + 10, ts from t where h = 96;
+insert into midgard.pool_events (asset, status, event_id, block_timestamp)
+select pool, status, h * 10000000000 + 9000000000 + 20 + i, ts from t join (values
+  (96, 'BTC.BTC', 'Available', 1), (96, 'ETH.ETH', 'Staged', 2), (100, 'ETH.ETH', 'Available', 1)) v(h, pool, status, i) using (h);
+insert into midgard_agg.members_count (pool, count, block_timestamp)
+select pool, n, ts from t join (values (96, 'BTC.BTC', 1), (102, 'BTC.BTC', 2)) v(h, pool, n) using (h);

@@ -38,3 +38,7 @@ insert into midgard.rewards_event_entries select 'BTC.BTC', 50000000, 0, h * 100
 insert into midgard.update_node_account_status_events select 'thor1n2', 'Standby', 'Active', 104 * 10000000000 + 9000000000 + 5, ts from t where h = 104;
 insert into midgard.bond_events (tx, asset_e8, bond_type, e8, node_addr, event_id, block_timestamp)
 select 'BOND2', 0, 'bond_paid', 100000000000, 'thor1n2', 104 * 10000000000 + 1000000000 + 6, ts from t where h = 104;
+insert into midgard.pool_events (asset, status, event_id, block_timestamp)
+select 'BTC.BTC', 'Suspended', 103 * 10000000000 + 9000000000 + 20, ts from t where h = 103;
+insert into midgard_agg.members_count (pool, count, block_timestamp)
+select 'ETH.ETH', 1, ts from t where h = 104;

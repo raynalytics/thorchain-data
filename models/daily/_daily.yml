@@ -133,6 +133,8 @@ models:
         description: "Number of Active nodes at the end of the day."
         data_tests:
           - not_negative
+      - name: average_active_nodes
+        description: "Average number of Active nodes over the day, weighted by time in seconds, as Midgard's earnings history computes it. The last indexed day is averaged up to its last block."
   - name: daily__pools
     description: "One row per pool per day, every day from the pool's first depth record until the last indexed day (or the pool's last record, if it was emptied). Flows are totals for the day; depths, units and prices are as of the end of the day. Saver (synth) positions are not included."
     data_tests:
@@ -185,6 +187,18 @@ models:
         description: "Liquidity units of the pool at the end of the day: the running total of units issued and burned."
         data_tests:
           - not_negative
+      - name: synth_units
+        description: "Liquidity units the pool's synths stand for, as Midgard computes them: liquidity units × synth supply ÷ (2 × asset depth − synth supply)."
+      - name: pool_units
+        description: "`liquidity_units` + `synth_units`."
+      - name: liquidity_unit_value_index
+        description: "Liquidity unit value index (LUVI): √(asset depth × RUNE depth) ÷ `pool_units`, from raw (1e-8) depths. Its growth over time is the yield of one liquidity unit."
+      - name: liquidity_providers
+        description: "Number of liquidity providers in the pool at the end of the day: addresses with liquidity units or pending liquidity, as Midgard counts them (`midgard_agg.members_count`)."
+        data_tests:
+          - not_negative
+      - name: status
+        description: "Pool status at the end of the day (`Available`, `Staged`, `Suspended`), from the latest status change; empty before the first."
       - name: swap_count
         description: "Number of user swaps that started on the day with a leg in this pool."
         data_tests:
@@ -207,6 +221,48 @@ models:
           - not_negative
       - name: liquidity_fee_usd
         description: "`liquidity_fee` in USD: the sum of values priced at each event's block."
+      - name: to_asset_leg_count
+        description: "Number of swap legs paying out the pool's asset (RUNE in), all leg types."
+        data_tests:
+          - not_negative
+      - name: to_rune_leg_count
+        description: "Number of swap legs paying out RUNE (the pool's asset in), all leg types."
+        data_tests:
+          - not_negative
+      - name: to_asset_swap_volume
+        description: "Swap volume of the legs paying out the asset, in RUNE."
+      - name: to_asset_swap_volume_e8
+        description: "`to_asset_swap_volume` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: to_asset_swap_volume_usd
+        description: "`to_asset_swap_volume` in USD: the sum of values priced at each event's block."
+      - name: to_rune_swap_volume
+        description: "Swap volume of the legs paying out RUNE, in RUNE."
+      - name: to_rune_swap_volume_e8
+        description: "`to_rune_swap_volume` as a raw chain integer (1e-8 units)."
+        data_tests:
+          - not_negative
+      - name: to_rune_swap_volume_usd
+        description: "`to_rune_swap_volume` in USD: the sum of values priced at each event's block."
+      - name: to_asset_liquidity_fee
+        description: "Liquidity fee charged on the legs paying out the asset, in RUNE."
+      - name: to_asset_liquidity_fee_e8
+        description: "`to_asset_liquidity_fee` as a raw chain integer (1e-8 units)."
+      - name: to_asset_liquidity_fee_usd
+        description: "`to_asset_liquidity_fee` in USD: the sum of values priced at each event's block."
+      - name: to_rune_liquidity_fee
+        description: "Liquidity fee charged on the legs paying out RUNE, in RUNE."
+      - name: to_rune_liquidity_fee_e8
+        description: "`to_rune_liquidity_fee` as a raw chain integer (1e-8 units)."
+      - name: to_rune_liquidity_fee_usd
+        description: "`to_rune_liquidity_fee` in USD: the sum of values priced at each event's block."
+      - name: average_slip_bps
+        description: "Average price slip of the day's swap legs in the pool, in basis points."
+      - name: to_asset_average_slip_bps
+        description: "Average price slip of the legs paying out the asset, in basis points."
+      - name: to_rune_average_slip_bps
+        description: "Average price slip of the legs paying out RUNE, in basis points."
       - name: pool_rewards
         description: "{{ doc('pool_rewards') }}"
       - name: pool_rewards_e8

@@ -72,7 +72,8 @@ sources:
       - name: wasm_contracts_events
       - name: withdraw_events
   - name: midgard_agg
-    description: Aggregates Midgard builds for its own API. Used only to check that the clean tables agree with Midgard.
+    description: Aggregates Midgard builds for its own API. Used to check that the clean tables agree with Midgard, and for liquidity provider counts, which Midgard keeps as running state.
     schema: midgard_agg
     tables:
+      - name: members_count
       - name: swaps_day

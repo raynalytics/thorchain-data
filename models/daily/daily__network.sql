@@ -134,6 +134,55 @@ running as (
         on bond_changes.day = rune_prices.day
     left join node_changes
         on node_changes.day = rune_prices.day
+),
+
+-- Average number of Active nodes over the day, weighted by time in seconds, as Midgard's earnings
+-- history computes it. The last indexed day is averaged up to its last block.
+day_spans as (
+    select
+        day,
+        active_nodes - coalesce(day_change.active_node_change, 0) as start_active_nodes,
+        extract(epoch from day::timestamp)::bigint as start_second,
+        least(
+            extract(epoch from (day + 1)::timestamp)::bigint,
+            (select floor(extract(epoch from block_time))::bigint from {{ ref('core__blocks') }} order by block_height desc limit 1)
+        ) as end_second
+    from running
+    left join node_changes as day_change
+        using (day)
+),
+
+node_steps as (
+    select
+        changes.day,
+        floor(extract(epoch from changes.block_time))::bigint as change_second,
+        day_spans.start_active_nodes + sum(changes.active_node_change) over (
+            partition by changes.day order by changes.block_time, changes.event_id rows between unbounded preceding and current row
+        ) as active_nodes_after,
+        coalesce(
+            lead(floor(extract(epoch from changes.block_time))::bigint) over (partition by changes.day order by changes.block_time, changes.event_id),
+            day_spans.end_second
+        ) as next_second
+    from {{ ref('core__node_status_changes') }} as changes
+    inner join day_spans
+        on day_spans.day = changes.day
+    where changes.active_node_change <> 0
+    {%- if is_incremental() %}
+        and changes.block_height >= {{ since_block }}
+    {%- endif %}
+),
+
+average_nodes as (
+    select
+        day_spans.day,
+        (
+            day_spans.start_active_nodes * (coalesce(min(node_steps.change_second), day_spans.end_second) - day_spans.start_second)
+            + coalesce(sum(node_steps.active_nodes_after * (node_steps.next_second - node_steps.change_second)), 0)
+        )::numeric / nullif(day_spans.end_second - day_spans.start_second, 0) as average_active_nodes
+    from day_spans
+    left join node_steps
+        on node_steps.day = day_spans.day
+    group by day_spans.day, day_spans.start_active_nodes, day_spans.start_second, day_spans.end_second
 )
 
 select
@@ -172,8 +221,11 @@ select
     {{ units('running.total_value_pooled_e8 + running.total_value_bonded_e8') }} as total_value_locked,
     running.total_value_pooled_e8 + running.total_value_bonded_e8 as total_value_locked_e8,
     {{ units('running.total_value_pooled_e8 + running.total_value_bonded_e8') }} * running.rune_price_usd as total_value_locked_usd,
-    running.active_nodes
+    running.active_nodes,
+    round(average_nodes.average_active_nodes, 2) as average_active_nodes
 from running
+left join average_nodes
+    on average_nodes.day = running.day
 left join swaps
     on swaps.day = running.day
 left join swap_legs
